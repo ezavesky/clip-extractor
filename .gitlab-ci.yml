@@ -1,0 +1,252 @@
+# This file is a template, and might need editing before it works on your project.
+# Official language image. Look for the different tagged releases at:
+# https://hub.docker.com/r/library/python/tags/
+image: docker:latest
+
+# Change pip's cache directory to be inside the project directory since we can
+# only cache local items.
+# https://docs.gitlab.com/ee/ci/variables/#syntax-of-environment-variables-in-job-scripts
+variables:
+  DOCKER_PROJECT: clip_extractor
+  USER_NAME: acquire  # required for file access compatibilty
+  USER_UID: 29980 # required for mount compatibility (user: acquire)
+  GROUP_UID: 30755 # required for mount compatibility (group: miracle)
+  DEPLOY_HOST: $DEPLOY_HOST # target host for deploy
+  DEPLOY_STORAGE: /n/vmtsr02/dockerimg # path on destination for files
+  DEPLOY_VOLUMES: $DEPLOY_VOLUMES  # specific volumes to mount (e.g. -v /n/docroot5/projects:/projects  -v /n/vmtsr01:/vmtsr01)
+  DEPLOY_LIMIT: 3  # max number of tar images to leave around
+  DEPLOY_PORT_PROD: 9301
+  DEPLOY_PORT_DEV: 9303
+
+
+services:
+  - docker:dind
+
+stages:
+  - setup
+  - build
+  - test
+  - deploy
+  - publish
+
+
+before_script:
+  # This script, which runs before all jobs will install some componentry
+  # to do SSH into our servers.  You may need to copy the environment variable
+  # "SSH_PRIVATE_KEY" from Gitlab in Settings -> CI/CD -> Environment Variables
+  #
+  # install SSH key for posting
+  # https://docs.gitlab.com/ee/ci/ssh_keys/
+  # https://threedots.tech/post/automatic-semantic-versioning-in-gitlab-ci/
+  ##
+  ## Install ssh-agent if not already installed, it is required by Docker.
+  ## (change apt-get to yum if you use an RPM-based image)
+  # Note: using 'apk add' instead of 'apt-get install' because of alpine linux base (docker)
+  ##
+  - 'which ssh-agent || ( apk add openssh-client  )'
+  ##
+  ## Create the SSH directory and give it the right permissions
+  ##
+  - mkdir -p ~/.ssh
+  - chmod 700 ~/.ssh
+  ##
+  ## Run ssh-agent (inside the build environment)
+  ##
+  - eval $(ssh-agent -s)
+  ##
+  ## Add the SSH key stored in SSH_PRIVATE_KEY variable to the agent store
+  ## We're using tr to fix line endings which makes ed25519 keys work
+  ## without extra base64 encoding.
+  ## https://gitlab.com/gitlab-examples/ssh-private-key/issues/1#note_48526556
+  ##
+  - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add - > /dev/null
+  - ssh-keyscan $DEPLOY_HOST >> ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
+  - export BUILD_VER="$(cat build/version)"
+  - export BUILD_ARTIFACT="$(cat build/artifact)"
+  - export BUILD_STORAGE="$(cat build/storage)"
+  - export BUILD_STORAGE_APP="$(cat build/storage_app)"
+  - export BUILD_IMAGE="$(cat build/image)"
+  # if running on master, use proper port; otherwise use debug port for publish on HOST
+  - '[ "$CI_COMMIT_REF_NAME" == "master" ] && export BUILD_PORT="$DEPLOY_PORT_PROD" || export BUILD_PORT="$DEPLOY_PORT_DEV" '
+  - '[ "$CI_COMMIT_REF_NAME" == "master" ] && export BUILD_NAME="$DOCKER_PROJECT-master" || export BUILD_NAME="$DOCKER_PROJECT-dev" '
+  # derive container file from artifact name
+  - export CONTAINER_TEST_FILE="$BUILD_ARTIFACT"
+  - export CONTAINER_TEST_FILE_APP="$(echo '$CONTAINER_TEST_FILE' | sed -e 's/\.tar$/-app.tar/g')"
+  - echo "Build Information-- image- $BUILD_IMAGE ; Ver- $BUILD_VER ; Intermediate- $CONTAINER_TEST_FILE; Storage- $BUILD_STORAGE; Build Name- $BUILD_NAME"
+
+
+setup:
+  stage: setup
+  script:
+    - mkdir -p build
+    # https://threedots.tech/post/automatic-semantic-versioning-in-gitlab-ci/
+    - "[ -f _version.py ] && export VERSION=$(cat _version.py | grep version | awk '{print $3}' | sed -e 's@\"@@g' )"    #start from file?
+    # if master, use repo version alone
+    - '[ "$CI_COMMIT_REF_NAME" == "master" ] && export VERSION="$VERSION" || export VERSION="$VERSION.$(date +%Y%m%d.%H%M)" '
+    - "[ -z $BUILD_VER ] && export BUILD_VER=$VERSION"  # not provided in build variables
+    # - export VERSION=$CI_COMMIT_SHORT_SHA   # use commit hash as dev vesion?
+    - echo "$BUILD_VER" > build/version
+    - echo "$BUILD_NAME-$BUILD_VER-$CI_COMMIT_SHORT_SHA.tar" > build/artifact
+    # save where we wrote it so that others could access the file?
+    - echo "$DEPLOY_STORAGE/$BUILD_NAME-$BUILD_VER-$CI_COMMIT_SHORT_SHA.tar" > build/storage
+    - echo "$DEPLOY_STORAGE/$BUILD_NAME-$BUILD_VER-$CI_COMMIT_SHORT_SHA-app.tar" > build/storage_app
+    - echo "$DOCKER_BASE:$BUILD_NAME-$BUILD_VER-$CI_COMMIT_SHORT_SHA" > build/image
+    - echo "$BUILD_VER (commit $CI_COMMIT_SHORT_SHA)"
+    - echo "$DEPLOY_HOST"
+  artifacts:
+    paths:
+      - build
+
+
+
+build:
+  stage: build
+  script:
+    # build but with a specifc username
+    - docker build -t intermediate --build-arg user=$USER_NAME --build-arg=model_repo=$MODEL_REPO --build-arg uid=$USER_UID --build-arg gid=$GROUP_UID -f Dockerfile .
+    - docker tag intermediate $BUILD_IMAGE
+    # print out the size of the new docker image
+    - docker image inspect $BUILD_IMAGE --format='{{.Size}}'
+    # attempt to push to docker hub
+    - docker info
+    # save to local disk
+    - docker save --output="$CONTAINER_TEST_FILE" $BUILD_IMAGE
+    - chmod a+r,g+rw "$CONTAINER_TEST_FILE"
+    # - docker push $BUILD_IMAGE
+    # upload to back-up server
+    - 'which ssh-agent || ( apk add openssh-client  )'
+    - scp "$CONTAINER_TEST_FILE" "$USER_NAME@$DEPLOY_HOST:$BUILD_STORAGE"
+
+# testscr:
+#   stage: test
+#   dependencies:
+#     - setup
+#   script:
+#     # retrieve from back-up server
+#     - scp "$USER_NAME@$DEPLOY_HOST:$BUILD_STORAGE" "$CONTAINER_TEST_FILE"
+#     # otherwise, load docker from tar
+#     - docker image load -i $CONTAINER_TEST_FILE
+#     # note the magic sauce with conda! (https://github.com/tox-dev/tox-conda)
+#     - docker run --rm -v `pwd`:/testrun $BUILD_IMAGE /bin/bash -c "cd /testrun && pip install tox-conda flake8 && pip uninstall -y $DOCKER_PROJECT && pip freeze && tox . && python setup.py bdist_wheel"
+#   artifacts:
+#     paths:
+#       - htmlcov
+#       - dist/*.whl
+#   coverage: '/TOTAL\s*\d+\s+\d+\s+(\d+\.?\d*)%/'
+
+
+launch:
+  stage: deploy
+  dependencies:
+    - setup
+  script:
+    - echo "Deploy Information-- image- $BUILD_IMAGE ; Ver- $BUILD_VER ; Intermediate- $CONTAINER_TEST_FILE; Storage- $BUILD_STORAGE"
+    # get instance name 
+    - export DOCKER_INSTANCE=$(ssh $USER_NAME@$DEPLOY_HOST "docker ps -a | grep $BUILD_NAME " | awk "{print \$1}" | xargs echo)
+    # find previous docker imaages
+    - export DOCKER_IMAGE=$(ssh $USER_NAME@$DEPLOY_HOST "docker image ls | grep $BUILD_NAME " | awk "{print \$3}" | xargs echo)
+    # if there are some instances to stop, try to do so here
+    - echo "Found Instances= $DOCKER_INSTANCE; Found Image= $DOCKER_IMAGE "
+    # stop and remove the container and the imge of the previous docker instance (if one existed)
+    - '[ ! -z "$DOCKER_INSTANCE" ] && ssh $USER_NAME@$DEPLOY_HOST "docker stop $DOCKER_INSTANCE && docker rm $DOCKER_INSTANCE"'
+    - '[ ! -z "$DOCKER_IMAGE" ] && ssh $USER_NAME@$DEPLOY_HOST "docker image rm $DOCKER_IMAGE"'
+    # load new docker image from tar
+    - ssh $USER_NAME@$DEPLOY_HOST "docker load -i $BUILD_STORAGE"
+    # restart new instance with proper port
+    - export RUN_CMD="docker run -d -p $BUILD_PORT:9101 --env run_mode='server' $DEPLOY_VOLUMES $BUILD_IMAGE"
+    - echo "Running= '$RUN_CMD'"
+    - ssh $USER_NAME@$DEPLOY_HOST $RUN_CMD
+
+
+cleanup:
+  stage: publish
+  script:
+    # remove more than MAX_LIST items
+    # find only those running on the target port (expanded to find any image that is running any version)
+    - '[ "$CI_COMMIT_REF_NAME" == "master" ] && export EXISTING_FILES=$(ssh $USER_NAME@$DEPLOY_HOST "ls -1 $DEPLOY_STORAGE/$DOCKER_PROJECT* | grep -v dev") || export EXISTING_FILES=$(ssh $USER_NAME@$DEPLOY_HOST "ls -1 $DEPLOY_STORAGE/$DOCKER_PROJECT* | grep dev" ) '
+    # - ssh $USER_NAME@$DEPLOY_HOST 'echo "Total Instances= $(ls -1 $DEPLOY_STORAGE/$DOCKER_PROJECT* | wc -l)"'
+    - echo "Total Instances= $(echo $EXISTING_FILES | wc -w), $EXISTING_FILES"
+    # remove docker images as they are deleted, too
+    - '[ "$CI_COMMIT_REF_NAME" == "master" ] && export EXISTING_FILES=$(ssh $USER_NAME@$DEPLOY_HOST "ls -1 $DEPLOY_STORAGE/$DOCKER_PROJECT* --sort=time  | grep -v dev | tail -n +$DEPLOY_LIMIT" | xargs echo) || export EXISTING_FILES=$(ssh $USER_NAME@$DEPLOY_HOST "ls -1 $DEPLOY_STORAGE/$DOCKER_PROJECT* --sort=time  | grep dev | tail -n +$DEPLOY_LIMIT" | xargs echo ) '
+    - echo "Purge Images= $EXISTING_FILES"
+    - ssh $USER_NAME@$DEPLOY_HOST "cd $DEPLOY_STORAGE && touch /tmp/$DOCKER_PROJECT-empty && rm /tmp/$DOCKER_PROJECT-empty $EXISTING_FILES"
+  dependencies:
+    - setup
+
+
+contentai_push:
+  stage: publish
+  # stage: brute
+  script:
+    # This script requires a special ContentAI API Key.
+    # You may need to copy the environment variable
+    # "CONTENTAI_API_KEY" from Gitlab in Settings -> CI/CD -> Environment Variables
+    # first, install curl tool (note on alpine (docker image))
+    - apk add curl
+    - export CONTENTAI_VERSION=$(curl -s contentai http://get-cli.contentai.io/master)
+    - curl -so /tmp/contentai http://get-cli.contentai.io/$CONTENTAI_VERSION/ncd_linux_386
+    - chmod +x /tmp/contentai
+    # --- as of 1/9/20 logins were interactive, causing issues 
+    # - /tmp/contentai login $CONTENTAI_API_KEY
+    - mkdir -p ~/.contentai 
+    - echo "{ \"apiKey\":\"$CONTENTAI_API_KEY\", \"apiEndpoint\":\"https://prod.api.contentai.io\" }" > ~/.contentai/config
+    # grab latest docker image
+    # - scp "$USER_NAME@$DEPLOY_HOST:$DEPLOY_STORAGE/sceneboundary-extractor-1.0.5-f99af636.tar" "$CONTAINER_TEST_FILE" 
+    - scp "$USER_NAME@$DEPLOY_HOST:$BUILD_STORAGE" "$CONTAINER_TEST_FILE"
+    # load this docker image to local host, retag
+    - docker load -i $CONTAINER_TEST_FILE
+    # deploy via contentai
+    # - /tmp/contentai deploy sceneboundary --cpu 1024 --memory 2048 -i "vmlr/analytics:sceneboundary-extractor-1.0.5-f99af636"
+    - /tmp/contentai deploy dsai_$DOCKER_PROJECT -i "$BUILD_IMAGE"
+  dependencies:
+    - setup
+  only:
+    - master
+
+
+
+# docgen:
+#   stage: deploy
+#   image: conda/miniconda3:latest
+#   script:
+#     - pip install Sphinx sphinx_rtd_theme
+#     - sphinx-apidoc -f -o docs/api . setup* --no-toc
+#     - sphinx-build -b html docs build/html
+#     # - rm -rf htmlcov
+#     - ls -l build
+#   artifacts:
+#     paths:
+#     - build
+#   dependencies:
+#     - testscr
+#   before_script:
+#     - echo "Skipping SSH access"
+
+
+# docker_publish:
+#   stage: publish
+#   script:
+#     # retrieve from back-up server
+#     - scp "$USER_NAME@$DEPLOY_HOST:$BUILD_STORAGE" "$CONTAINER_TEST_FILE"
+#     - docker image load -i $CONTAINER_TEST_FILE
+#     # also push to docker hub! - https://stackoverflow.com/questions/45517733/how-to-publish-docker-images-to-docker-hub-from-gitlab-ci
+#     # - docker login -u "vmlr" -p "$DOCKER_PASSWORD" "docker.io"
+#     # - docker push $BUILD_IMAGE
+#   dependencies:
+#     - setup
+
+
+# pages:
+#   stage: publish
+#   script:
+#     - mkdir -p public
+#     - cp -R build/html/ public/
+#   only:
+#     - master
+#   artifacts:
+#     paths:
+#     - public
+#   dependencies:
+#     - docgen
+#   before_script:
+#     - echo "Skipping SSH access"

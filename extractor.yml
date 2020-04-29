@@ -1,0 +1,17 @@
+name: dsai_clip_extractor
+
+description: This extractor uses generated shots or segments to generate clips and keyframes for consumption.
+
+url: "https://gitlab.research.att.com/turnercode/clip-extractor"
+
+contact: acquire@research.att.com
+
+cpu: 1024
+memory: 2048
+
+#environment:
+#  FOO: bar
+#  BAR: baz
+
+#dependencies:
+#  - gcp_upload

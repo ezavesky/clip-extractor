@@ -1,0 +1,4 @@
+metadata_flatten @ git+https://gitlab.research.att.com/turnercode/metadata-flatten-extractor#egg=metadata_flatten
+ffmpeg
+pandas
+numexpr
