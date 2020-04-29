@@ -117,6 +117,7 @@ build:
     - 'which ssh-agent || ( apk add openssh-client  )'
     - scp "$CONTAINER_TEST_FILE" "$USER_NAME@$DEPLOY_HOST:$BUILD_STORAGE"
 
+
 # testscr:
 #   stage: test
 #   dependencies:
@@ -135,27 +136,27 @@ build:
 #   coverage: '/TOTAL\s*\d+\s+\d+\s+(\d+\.?\d*)%/'
 
 
-launch:
-  stage: deploy
-  dependencies:
-    - setup
-  script:
-    - echo "Deploy Information-- image- $BUILD_IMAGE ; Ver- $BUILD_VER ; Intermediate- $CONTAINER_TEST_FILE; Storage- $BUILD_STORAGE"
-    # get instance name 
-    - export DOCKER_INSTANCE=$(ssh $USER_NAME@$DEPLOY_HOST "docker ps -a | grep $BUILD_NAME " | awk "{print \$1}" | xargs echo)
-    # find previous docker imaages
-    - export DOCKER_IMAGE=$(ssh $USER_NAME@$DEPLOY_HOST "docker image ls | grep $BUILD_NAME " | awk "{print \$3}" | xargs echo)
-    # if there are some instances to stop, try to do so here
-    - echo "Found Instances= $DOCKER_INSTANCE; Found Image= $DOCKER_IMAGE "
-    # stop and remove the container and the imge of the previous docker instance (if one existed)
-    - '[ ! -z "$DOCKER_INSTANCE" ] && ssh $USER_NAME@$DEPLOY_HOST "docker stop $DOCKER_INSTANCE && docker rm $DOCKER_INSTANCE"'
-    - '[ ! -z "$DOCKER_IMAGE" ] && ssh $USER_NAME@$DEPLOY_HOST "docker image rm $DOCKER_IMAGE"'
-    # load new docker image from tar
-    - ssh $USER_NAME@$DEPLOY_HOST "docker load -i $BUILD_STORAGE"
-    # restart new instance with proper port
-    - export RUN_CMD="docker run -d -p $BUILD_PORT:9101 --env run_mode='server' $DEPLOY_VOLUMES $BUILD_IMAGE"
-    - echo "Running= '$RUN_CMD'"
-    - ssh $USER_NAME@$DEPLOY_HOST $RUN_CMD
+# launch:
+#   stage: deploy
+#   dependencies:
+#     - setup
+#   script:
+#     - echo "Deploy Information-- image- $BUILD_IMAGE ; Ver- $BUILD_VER ; Intermediate- $CONTAINER_TEST_FILE; Storage- $BUILD_STORAGE"
+#     # get instance name 
+#     - export DOCKER_INSTANCE=$(ssh $USER_NAME@$DEPLOY_HOST "docker ps -a | grep $BUILD_NAME " | awk "{print \$1}" | xargs echo)
+#     # find previous docker imaages
+#     - export DOCKER_IMAGE=$(ssh $USER_NAME@$DEPLOY_HOST "docker image ls | grep $BUILD_NAME " | awk "{print \$3}" | xargs echo)
+#     # if there are some instances to stop, try to do so here
+#     - echo "Found Instances= $DOCKER_INSTANCE; Found Image= $DOCKER_IMAGE "
+#     # stop and remove the container and the imge of the previous docker instance (if one existed)
+#     - '[ ! -z "$DOCKER_INSTANCE" ] && ssh $USER_NAME@$DEPLOY_HOST "docker stop $DOCKER_INSTANCE && docker rm $DOCKER_INSTANCE"'
+#     - '[ ! -z "$DOCKER_IMAGE" ] && ssh $USER_NAME@$DEPLOY_HOST "docker image rm $DOCKER_IMAGE"'
+#     # load new docker image from tar
+#     - ssh $USER_NAME@$DEPLOY_HOST "docker load -i $BUILD_STORAGE"
+#     # restart new instance with proper port
+#     - export RUN_CMD="docker run -d -p $BUILD_PORT:9101 --env run_mode='server' $DEPLOY_VOLUMES $BUILD_IMAGE"
+#     - echo "Running= '$RUN_CMD'"
+#     - ssh $USER_NAME@$DEPLOY_HOST $RUN_CMD
 
 
 cleanup:
@@ -174,34 +175,34 @@ cleanup:
     - setup
 
 
-contentai_push:
-  stage: publish
-  # stage: brute
-  script:
-    # This script requires a special ContentAI API Key.
-    # You may need to copy the environment variable
-    # "CONTENTAI_API_KEY" from Gitlab in Settings -> CI/CD -> Environment Variables
-    # first, install curl tool (note on alpine (docker image))
-    - apk add curl
-    - export CONTENTAI_VERSION=$(curl -s contentai http://get-cli.contentai.io/master)
-    - curl -so /tmp/contentai http://get-cli.contentai.io/$CONTENTAI_VERSION/ncd_linux_386
-    - chmod +x /tmp/contentai
-    # --- as of 1/9/20 logins were interactive, causing issues 
-    # - /tmp/contentai login $CONTENTAI_API_KEY
-    - mkdir -p ~/.contentai 
-    - echo "{ \"apiKey\":\"$CONTENTAI_API_KEY\", \"apiEndpoint\":\"https://prod.api.contentai.io\" }" > ~/.contentai/config
-    # grab latest docker image
-    # - scp "$USER_NAME@$DEPLOY_HOST:$DEPLOY_STORAGE/sceneboundary-extractor-1.0.5-f99af636.tar" "$CONTAINER_TEST_FILE" 
-    - scp "$USER_NAME@$DEPLOY_HOST:$BUILD_STORAGE" "$CONTAINER_TEST_FILE"
-    # load this docker image to local host, retag
-    - docker load -i $CONTAINER_TEST_FILE
-    # deploy via contentai
-    # - /tmp/contentai deploy sceneboundary --cpu 1024 --memory 2048 -i "vmlr/analytics:sceneboundary-extractor-1.0.5-f99af636"
-    - /tmp/contentai deploy dsai_$DOCKER_PROJECT -i "$BUILD_IMAGE"
-  dependencies:
-    - setup
-  only:
-    - master
+# contentai_push:
+#   stage: publish
+#   # stage: brute
+#   script:
+#     # This script requires a special ContentAI API Key.
+#     # You may need to copy the environment variable
+#     # "CONTENTAI_API_KEY" from Gitlab in Settings -> CI/CD -> Environment Variables
+#     # first, install curl tool (note on alpine (docker image))
+#     - apk add curl
+#     - export CONTENTAI_VERSION=$(curl -s contentai http://get-cli.contentai.io/master)
+#     - curl -so /tmp/contentai http://get-cli.contentai.io/$CONTENTAI_VERSION/ncd_linux_386
+#     - chmod +x /tmp/contentai
+#     # --- as of 1/9/20 logins were interactive, causing issues 
+#     # - /tmp/contentai login $CONTENTAI_API_KEY
+#     - mkdir -p ~/.contentai 
+#     - echo "{ \"apiKey\":\"$CONTENTAI_API_KEY\", \"apiEndpoint\":\"https://prod.api.contentai.io\" }" > ~/.contentai/config
+#     # grab latest docker image
+#     # - scp "$USER_NAME@$DEPLOY_HOST:$DEPLOY_STORAGE/sceneboundary-extractor-1.0.5-f99af636.tar" "$CONTAINER_TEST_FILE" 
+#     - scp "$USER_NAME@$DEPLOY_HOST:$BUILD_STORAGE" "$CONTAINER_TEST_FILE"
+#     # load this docker image to local host, retag
+#     - docker load -i $CONTAINER_TEST_FILE
+#     # deploy via contentai
+#     # - /tmp/contentai deploy sceneboundary --cpu 1024 --memory 2048 -i "vmlr/analytics:sceneboundary-extractor-1.0.5-f99af636"
+#     - /tmp/contentai deploy dsai_$DOCKER_PROJECT -i "$BUILD_IMAGE"
+#   dependencies:
+#     - setup
+#   only:
+#     - master
 
 
 
