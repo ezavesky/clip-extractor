@@ -13,10 +13,10 @@ RUNARGS="$4"
 DOCKERIMG="$3" # clip_extractor # 0a9d09f733e1
 
 if [ "$DOCKERIMG" == "0" ]; then
-    docker run --rm -v `pwd`/..:/work -e EXTRACTOR_METADATA="$RUNARGS" -e EXTRACTOR_NAME=clip_extractor -e EXTRACTOR_JOB_ID=1 \
-        -e EXTRACTOR_CONTENT_PATH=$1 -e EXTRACTOR_CONTENT_URL=file://$1 -e EXTRACTOR_RESULT_PATH=$2 $DOCKERIMG
-else
     EXTRACTOR_METADATA="$RUNARGS" EXTRACTOR_NAME=clip_extractor EXTRACTOR_JOB_ID=1 \
         EXTRACTOR_CONTENT_PATH=$1 EXTRACTOR_CONTENT_URL=file://$1 EXTRACTOR_RESULT_PATH=$2 \
         python -u main.py
+else
+    docker run --rm -v `pwd`/..:/work -e EXTRACTOR_METADATA="$RUNARGS" -e EXTRACTOR_NAME=clip_extractor -e EXTRACTOR_JOB_ID=1 \
+        -e EXTRACTOR_CONTENT_PATH=$1 -e EXTRACTOR_CONTENT_URL=file://$1 -e EXTRACTOR_RESULT_PATH=$2 $DOCKERIMG
 fi
