@@ -19,7 +19,7 @@
 # -*- coding: utf-8 -*-
 
 import contentai
-from os import path
+import os
 import sys
 
 import logging
@@ -37,7 +37,7 @@ def main(input_vars=None):
         # after calling contentai.download_content()
         logger.info("Downloading content from ContentAI")
         contentai.download_content()
-        contentai.result_path = path.dirname(contentai.content_path)
+        contentai.result_path = os.path.dirname(contentai.content_path)
 
 
         parser = argparse.ArgumentParser(
@@ -47,8 +47,8 @@ def main(input_vars=None):
                 ....
         """, formatter_class=argparse.RawTextHelpFormatter)
         submain = parser.add_argument_group('main execution and evaluation functionality')
-        submain.add_argument('--path_content', dest='path_content', type=str, default=contentai.content_path, 
-                                help='input video path for files to label')
+        submain.add_argument('--path_video', type=str, default=contentai.content_path, 
+                                help='input video path')
         submain.add_argument('--path_result', dest='path_result', type=str, default=contentai.result_path, 
                                 help='output path for samples')
         submain.add_argument('--verbose', dest='verbose', default=False, action='store_true', help='verbosely print operations')
@@ -59,7 +59,28 @@ def main(input_vars=None):
         if contentai.metadata is not None:  # see README.md for more info
             input_vars.update(contentai.metadata)
 
-    path_chained = path.dirname(input_vars['path_content'])   # start with dir of content
+    logger.info (f"Received parameters: {input_vars}")
+
+    path_video = os.path.abspath(input_vars['path_video'])   # start with dir of content
+    path_scenes = os.path.abspath(input_vars['path_scenes'])   # file containing list of scenes e.g. 0,100\n 100,200\n etc
+    path_result = os.path.abspath(input_vars['path_result'])   # destination dir
+
+
+    def pair(line):
+        items = line.split(",")
+        if len(items) != 2:
+            items = line.split()
+            assert len(items) == 2, "Expected a pair of numbers"
+        return float(items[0]), float(items[1])
+
+    # Read the list of scenes -- one start,stop pair per line
+    scenes = [pair(x.strip()) for x in open(path_scenes).readlines() if len(x) > 1]
+
+    from getclips import get_clips
+    rootname = get_clips (path_video, scenes, path_result)
+
+    
+
 
     logger.info(f"Input argments: {input_vars}")
     logger.info("---- AFTER THIS THE ACTION HAPPENS -----")
@@ -82,4 +103,10 @@ def main(input_vars=None):
 
 
 if __name__ == "__main__":
-    main()
+    logging.basicConfig()
+    inputs = {'path_video':os.getenv('EXTRACTOR_CONTENT_PATH'),'path_scenes':os.getenv('EXTRACTOR_SCENES_PATH'),'path_result':os.getenv('EXTRACTOR_RESULT_PATH') }
+    if None in inputs.values():
+        main()
+    else:
+        main(inputs)
+
