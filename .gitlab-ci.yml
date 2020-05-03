@@ -80,7 +80,7 @@ setup:
   script:
     - mkdir -p build
     # https://threedots.tech/post/automatic-semantic-versioning-in-gitlab-ci/
-    - "[ -f _version.py ] && export VERSION=$(cat _version.py | grep version | awk '{print $3}' | sed -e 's@\"@@g' )"    #start from file?
+    - "[ -f _version.py ] && export VERSION=$(cat _version.py | grep version | awk '{print $2}' | sed -e 's@[\",]@@g' )"    #start from file?
     # if master, use repo version alone
     - '[ "$CI_COMMIT_REF_NAME" == "master" ] && export VERSION="$VERSION" || export VERSION="$VERSION.$(date +%Y%m%d.%H%M)" '
     - "[ -z $BUILD_VER ] && export BUILD_VER=$VERSION"  # not provided in build variables

@@ -31,13 +31,14 @@ logging.basicConfig()
 
 
 import contentai
+import _version
 
 
 def clip(input_params=None, args=None):
     # extract data from contentai.content_url
     # or if needed locally use contentai.content_path
     # after calling contentai.download_content()
-    
+
     print("Downloading content from ContentAI")
     contentai.download_content()
     contentai.result_path = str(Path(contentai.content_path).parent)
@@ -63,7 +64,9 @@ def clip(input_params=None, args=None):
     if input_params is not None:
         input_vars.update(input_params)
 
-    logger.info (f"Received parameters: {input_vars}")
+    version_info = _version.version()
+    logger.info(f"Received parameters: {input_vars}")
+    logger.info(f"Running Version: {version_info}")
 
     path_video = Path(input_vars['path_video'])   # start with dir of content
     path_scenes = Path(input_vars['path_scenes'])   # file containing list of scenes e.g. 0,100\n 100,200\n etc
