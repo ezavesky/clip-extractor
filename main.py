@@ -41,7 +41,6 @@ def clip(input_params=None, args=None):
 
     print("Downloading content from ContentAI")
     contentai.download_content()
-    contentai.result_path = str(Path(contentai.content_path).parent)
 
     parser = argparse.ArgumentParser(
         description="""A script to launch a clip docker""",
