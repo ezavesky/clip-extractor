@@ -52,8 +52,9 @@ def clip(input_params=None, args=None):
     submain = parser.add_argument_group('main execution and evaluation functionality')
     submain.add_argument('--path_video', type=str, default=contentai.content_path, 
                             help='input video path')
-    submain.add_argument('--path_result', dest='path_result', type=str, default=contentai.result_path, 
+    submain.add_argument('--path_result', type=str, default=contentai.result_path, 
                             help='output path for samples')
+    submain.add_argument('--profile', type=str, default='default', help='processing profile to use')
     submain.add_argument('--verbose', dest='verbose', default=False, action='store_true', help='verbosely print operations')
 
     input_vars = contentai.metadata
@@ -84,7 +85,7 @@ def clip(input_params=None, args=None):
     scenes = [pair(x.strip()) for x in open(path_scenes).readlines() if len(x) > 1]
 
     from getclips import get_clips
-    rootname = get_clips (path_video, scenes, path_result)
+    rootname = get_clips (path_video, scenes, path_result, profile=input_vars['profile'])
     logger.info(f"Results in: {rootname}")
 
     logger.info("---- AFTER THIS THE ACTION HAPPENS -----")

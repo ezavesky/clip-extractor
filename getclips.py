@@ -1,37 +1,31 @@
-import os.path
+import os
 import logging
 logger = logging.getLogger()
 
+ClipProfiles = {}
+ClipProfiles["default"] = "-y -v quiet -c copy"
+ClipProfiles["popcorn0"] = "-vf yadif -c:v libx264 -refs 4 -b:v 5M -coder 1 -preset photo -acodec aac -ac 2  -ar 44100  -ab 128k -f mp4"    #preset doesn't work
+ClipProfiles["popcorn"] = "-y -vf yadif -c:v libx264 -refs 4 -b:v 5M -coder 1 -acodec aac -ac 2  -ar 44100  -ab 128k -f mp4"
 
-# Easily replaced with alternate versions
 
-from moviepy.editor import VideoFileClip
-from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
-
-def make_one_clip (input_video_name, start_time, end_time, output_file):
-    from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
-    success = True
-    try:
-        ffmpeg_extract_subclip(input_video_name, start_time, end_time, output_file)
-    except Exception as err:
-        logger.error (f"get_clip {input_video_name}:", err)
-        success = False
-    return success
+def video_cut (source, start, stop, dest, profile):
+    dur = stop - start
+    cmd = f"ffmpeg -v quiet -ss {start} -i {source} -t {dur} {profile} {dest} < /dev/null"
+    #print (cmd)
+    return os.system(cmd)
 
 
 def thumb(name):
     return os.path.splitext(name)[0] + '.jpg'
 
 
-def make_thumbnail (fname):
+def make_thumbnail (fname, posn=1):
     success = True
     try:
         th_name = thumb(fname)
-        vid = VideoFileClip(fname)
-        vid.save_frame(th_name, 1)
-        vid.close()
+        os.system (f"ffmpeg -v quiet -y -ss {posn} -i {fname} -vframes 1 -q:v 2 {th_name}")
     except Exception as err:
-        logger.error (f"make_thumbnail {fname}:", err)
+        logger.error (f"make_thumbnail {fname}: {err}")
         success = False
     return success
 
@@ -49,24 +43,7 @@ def videofile_md5(filename, chunk_size=65536):
     return file_hash.hexdigest()
 
 
-def get_clips_previous (input_video, scene_list, output_dir):
-    try:
-        hashed_name = videofile_md5(input_video) 
-    except Exception as err:
-        logger.error (f"get_clips {input_video}: {err}")
-        return None
-    ext = os.path.splitext(input_video)[1]
-    for start,stop in scene_list:
-        clipname = os.path.join (output_dir, f"{hashed_name}_{start}-{stop}{ext}")
-        if not os.path.exists (clipname):
-            make_one_clip (input_video, start, stop, clipname)
-            make_thumbnail (clipname)
-        else:
-            logger.info (f"already exists: {clipname}")
-    return hashed_name
-
-
-def get_clips (input_video, scene_list, output_dir, overwrite=False):
+def get_clips (input_video, scene_list, output_dir, overwrite=False, profile="default"):
     try:
         hashed_name = videofile_md5(input_video) 
     except Exception as err:
@@ -82,7 +59,7 @@ def get_clips (input_video, scene_list, output_dir, overwrite=False):
     for start,stop in scene_list:
         clipname = os.path.join (outdirname, f"video.{start}-{stop}{ext}")
         if overwrite or not os.path.exists (clipname):
-            make_one_clip (input_video, start, stop, clipname)
+            video_cut (input_video, start, stop, clipname, ClipProfiles[profile])
             make_thumbnail (clipname)
         else:
             logger.info (f"already exists: {clipname}")
