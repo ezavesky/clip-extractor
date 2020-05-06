@@ -85,9 +85,8 @@ def clip(input_params=None, args=None):
 
     from getclips import get_clips
     rootname = get_clips (path_video, scenes, path_result)
+    logger.info(f"Results in: {rootname}")
 
-
-    logger.info(f"Input argments: {input_vars}")
     logger.info("---- AFTER THIS THE ACTION HAPPENS -----")
 
     logger.info("*p4* (previous input) processing input for regions")

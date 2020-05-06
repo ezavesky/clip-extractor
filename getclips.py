@@ -19,23 +19,8 @@ def make_one_clip (input_video_name, start_time, end_time, output_file):
     return success
 
 
-
-def get_thumbnail (input_clip_name, thumb_name):
-    success = True
-    try:
-        vid = VideoFileClip(input_clip_name)
-        vid.save_frame(thumb_name, 1)
-        vid.close()
-    except Exception as err:
-        logger.error (f"get_thumbnail {input_clip_name}:", err)
-        success = False
-    return success
-
-
-
 def thumb(name):
     return os.path.splitext(name)[0] + '.jpg'
-
 
 
 def make_thumbnail (fname):
@@ -51,7 +36,6 @@ def make_thumbnail (fname):
     return success
 
 
-
 # from https://stackoverflow.com/questions/1131220/get-md5-hash-of-big-files-in-python
 def videofile_md5(filename, chunk_size=65536):
     import hashlib
@@ -65,8 +49,7 @@ def videofile_md5(filename, chunk_size=65536):
     return file_hash.hexdigest()
 
 
-
-def get_clips (input_video, scene_list, output_dir):
+def get_clips_previous (input_video, scene_list, output_dir):
     try:
         hashed_name = videofile_md5(input_video) 
     except Exception as err:
@@ -79,23 +62,30 @@ def get_clips (input_video, scene_list, output_dir):
             make_one_clip (input_video, start, stop, clipname)
             make_thumbnail (clipname)
         else:
-            logger.info ("already exists: {clipname}")
+            logger.info (f"already exists: {clipname}")
     return hashed_name
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+def get_clips (input_video, scene_list, output_dir, overwrite=False):
+    try:
+        hashed_name = videofile_md5(input_video) 
+    except Exception as err:
+        logger.error (f"get_clips {input_video}: {err}")
+        return None
+    outdirname = os.path.join (output_dir, hashed_name)
+    if not os.path.exists(outdirname):
+        os.makedirs(outdirname, exist_ok=True)
+    elif not overwrite:
+        logger.info (f"already exists: {hashed_name}")
+        return hashed_name
+    ext = os.path.splitext(input_video)[1]
+    for start,stop in scene_list:
+        clipname = os.path.join (outdirname, f"video.{start}-{stop}{ext}")
+        if overwrite or not os.path.exists (clipname):
+            make_one_clip (input_video, start, stop, clipname)
+            make_thumbnail (clipname)
+        else:
+            logger.info (f"already exists: {clipname}")
+    return hashed_name
 
 
