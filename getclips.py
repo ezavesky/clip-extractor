@@ -1,11 +1,25 @@
 import os
 import logging
+from parallel_crop import load_video_cropped_info
+
+
 logger = logging.getLogger()
 
 ClipProfiles = {}
-ClipProfiles["default"] = "-y -v quiet -c copy"
+ClipProfiles["default"] = "-y -c copy"
 ClipProfiles["popcorn0"] = "-vf yadif -c:v libx264 -refs 4 -b:v 5M -coder 1 -preset photo -acodec aac -ac 2  -ar 44100  -ab 128k -f mp4"    #preset doesn't work
 ClipProfiles["popcorn"] = "-y -vf yadif -c:v libx264 -refs 4 -b:v 5M -coder 1 -acodec aac -ac 2  -ar 44100  -ab 128k -f mp4"
+ClipProfiles["letterbox"] = "-y -vf yadif {} -c:v libx264 -refs 4 -b:v 5M -coder 1 -acodec aac -ac 2  -ar 44100  -ab 128k -f mp4"
+
+
+
+def find_crop_coordinates (filename):
+    os.system (f"echo {filename} > video_list.txt")
+    os.system("cat video_list.txt | python detect_letter_box.py crop_info.txt")
+    os.system("cat crop_info.txt | python filter.py 20 > crop_filtered.txt")
+    os.system("cat crop_filtered.txt | python adjust_crop.py > crop_adjusted.txt")
+    crop_info = load_video_cropped_info("crop_adjusted.txt")
+    return "-vf " + crop_info[0][1]
 
 
 def video_cut (source, start, stop, dest, profile):
@@ -55,11 +69,17 @@ def get_clips (input_video, scene_list, output_dir, overwrite=False, profile="de
     elif not overwrite:
         logger.info (f"already exists: {hashed_name}")
         return hashed_name
+
+    profile_str = ClipProfiles[profile]
+    if profile == 'letterbox':
+        mod = find_crop_coordinates (input_video)  # returns ffmpeg syntax
+        profile_str = profile_str.format(mod)
+  
     ext = os.path.splitext(input_video)[1]
     for start,stop in scene_list:
         clipname = os.path.join (outdirname, f"video.{start}-{stop}{ext}")
         if overwrite or not os.path.exists (clipname):
-            video_cut (input_video, start, stop, clipname, ClipProfiles[profile])
+            video_cut (input_video, start, stop, clipname, profile_str)
             make_thumbnail (clipname)
         else:
             logger.info (f"already exists: {clipname}")
