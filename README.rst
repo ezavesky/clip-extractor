@@ -18,14 +18,50 @@ Getting Started
 ===============
 
 This library can be used as a `single-run
-executable <#contentai-standalone>`__ or a persistent `web
-service <#flask-based-webservice>`__. Runtime parameters can be passed
-for processing that configure the returned results and can be examped in
-more detail in the `process <process.py>`__ script.
+executable <#contentai-standalone>`__. Runtime parameters can be passed
+for processing that configure the returned results and can be examined in
+more detail in the `main <main.py>`__ script.
 
--  ``variable`` - *(string)* - specify a specific extractor to utilize
-   for shot boundary search; 
+-  ``verbose`` - *(bool)* - verbose input/output configuration printing (*default=false*)
+-  ``path_content`` - *(str)* - input video path for files to label (*default=video.mp4*)
+-  ``path_result`` - *(str)* - output path for samples (*default=.*)
+-  ``path_scenes`` - *(str)* - FILE to specify scene begin,end or DIRECTORY with extractor event outputs
+-  ``profile`` - *(string)* - specify a specific transcoding profile for the output video clips
+-  ``event_type`` - *(string)* - specify an event type to look for in generation (*default=tag*)
+-  ``event_min_score`` - *(float)* - minimum confidence score for a new event to be considered in a scene (*default=0.8*)
+-  ``event_min_length`` - *(float)* - minimum length in seconds for scene selection (*default=10*)
+-  ``event_expand_length`` - *(float)* - expand instant events to a minimum of this length in seconds (*default=3*)
+
+
+Clip Extractor Operations
+-------------------------
+
+1. Pre-processing - Steps to be determined before any transcoding or clipping is performed.
    
+   * Letterbox detection - will use tools to analyze the first N seconds of video and
+     determine if the content is letterboxed.
+
+2. Transcoding and clipping - All-in-one steps to simultaneously seek to and clip out a region
+   of video.  Here, different profiles are available and can be specified via the ``profiles`` 
+   parmaeter above.
+   
+   * TBD
+   * TBD 2
+
+
+
+Execution and Deployment
+========================
+
+This package is meant to be run as a one-off processing tool that
+aggregates the insights of other extractors.
+
+Locally Run
+-----------
+
+Run the code as if it is an extractor. In this mode, configure a few
+environment variables to let the code know where to look for content.
+
 To install package dependencies in a fresh system, the recommended
 technique is a combination of conda and pip packages. The latest
 requirements should be validated from the ``requirements.txt`` file but
@@ -36,29 +72,10 @@ at time of writing, they were the following.
    pip install --no-cache-dir -r requirements.txt 
 
 
-Execution and Deployment
-========================
-
-This package is meant to be run as a one-off processing tool that
-aggregates the insights of other extractors.
-
-command-line standalone
------------------------
-
-Run the code as if it is an extractor. In this mode, configure a few
-environment variables to let the code know where to look for content.
-
 One can also run the command-line with a single argument as input and
 optionally ad runtime configuration (see `runtime
 variables <#getting-started>`__) as part of the ``EXTRACTOR_METADATA``
 variable as JSON.
-
-.. code:: shell
-
-   python -u ./main.py 
-
-Locally Run on Results
-~~~~~~~~~~~~~~~~~~~~~~
 
 For utility, the above line has been wrapped in the bash script
 ``run_local.sh``.
@@ -78,11 +95,13 @@ configuration.
 
 .. code:: shell
 
-   ./run_local.sh path/video.mp4 results/ '{"upstream_path":"2398havAMSDF"}'
+   ./run_local.sh 0 --path_video path/video.mp4 --path_result results/ --profile letterbox 
+   ./run_local.sh 1 path/video.mp4 results/ '{"profile":"letterbox"}'
+   ./run_local.sh DOCKERIMAGE path/video.mp4 results/ '{"profile":"letterbox"}'
 
 
 
-Deploy and run
+Deploy and Run
 ~~~~~~~~~~~~~~
 
 .. code:: shell
@@ -138,26 +157,9 @@ view extractor logs (stdout)
 For an example of how to chain extractors together, see `this
 post <extractor-chaining.md>`__.
 
-Flask-based Webservice
-----------------------
-
-Here a webservice will be launched that attempts to use the temp
-directory as a primary location for file storage and retrieval. These
-files will be posted from the server or retrieved via a URL.
-
-.. code:: shell
-
-   flask run -h 0.0.0.0 -p 9101
-
 
 Testing
 =======
-
-An image ``models/pexels_austin.jpg`` has been included in this repository
-for stoking the download of embedding models.  Its original source is 
-`pexels <https://www.pexels.com/photo/america-architecture-austin-austin-texas-273204/>`__
-and it is used solely for testing and bootstrapping embedding during docker
-image creation.
 
 (testing and validation forthcoming)
 
