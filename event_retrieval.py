@@ -103,7 +103,7 @@ def rle(inarray):
         return(z, p, ia[i])
 
 
-def event_rle(df, score_threshold=0.8, duration_threshold=10, duration_expand=3, align_method='rle'):
+def event_rle(df, score_threshold=0.8, duration_threshold=10, duration_expand=3, peak_method='rle'):
     # original source (has sample for each time interval in video)
     # HBO_20200227_170000_clip_00004  40.2523 9.7069  3600.642700     {"explosion": 0.00016436472414050305}
     # HBO_20200227_170000_clip_00005  49.9592 10.3402 3600.642700     {"explosion": 0.0011733169780347246}
@@ -135,10 +135,10 @@ def event_rle(df, score_threshold=0.8, duration_threshold=10, duration_expand=3,
 
         # now perform run-length encoding from score mask
         mask = np.array(df_score_sample["score"]) > score_threshold
-        if align_method == 'rle':
+        if peak_method == 'rle':
             runlengths, start_pos, score_valid  =  rle(mask)
         else:
-            logger.error(f"Error: Unknown alignment method {align_method}, aborting.")
+            logger.error(f"Error: Unknown peak-detection method {peak_method}, aborting.")
             return None
         n  = len(runlengths)
         # print(mask, runlengths)

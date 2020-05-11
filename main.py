@@ -63,14 +63,14 @@ def clip(input_params=None, args=None):
                             help='FILE to specify scene begin,end or DIRECTORY with extractor event outputs')
     submain.add_argument('--verbose', dest='verbose', default=False, action='store_true', help='verbosely print operations')
 
+    submain = parser.add_argument_group('encoding specifications')
+    submain.add_argument('--profile', type=str, default='default', help='processing profile to use')
+
     submain = parser.add_argument_group('what tags and score requirments should be utilized')
     submain.add_argument('--event_type', type=str, default='face', help='what tag_type should be used to identify clips')
     submain.add_argument('--event_min_score', type=float, default=0.8, help='minimum score for encoding')
     submain.add_argument('--event_expand_length', type=float, default=3, help='expand instant events to a minimum of this length')
     submain.add_argument('--event_min_length', type=float, default=10, help='minimum length in seconds for scene selection')
-
-    submain = parser.add_argument_group('encoding specifications')
-    submain.add_argument('--profile', type=str, default='default', help='processing profile to use')
 
 
     input_vars = contentai.metadata
@@ -101,8 +101,6 @@ def clip(input_params=None, args=None):
 
     logger.info("*p1* (clip extraction) ffmpeg operation to pull out clips; provide specific processing profiles")
     time_tuples = df_scenes[["time_begin", "time_end"]].to_dict(orient='split')['data']
-    rootname = get_clips (path_content, list(df_scenes[["time_begin", "time_end"]]), path_result, profile=input_vars['profile'])
-    logger.info(f"Results in: {rootname}")
 
     logger.info("*p2* (clip specification) peak detection and alignment to various input components (e.g. shots, etc)")
 
@@ -114,7 +112,8 @@ def clip(input_params=None, args=None):
     logger.info("*p4* (previous input) processing input for regions")
 
     logger.info("*p5* (clip publishing) push of clips to result directory, an S3 bucket, hadoop, azure, etc")
-
+    rootname = get_clips (path_content, list(df_scenes[["time_begin", "time_end"]]), path_result, profile=input_vars['profile'])
+    logger.info(f"Results in: {rootname}")
 
 
 if __name__ == "__main__":
