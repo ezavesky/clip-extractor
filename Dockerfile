@@ -10,7 +10,7 @@ ARG PYPI_INSTALL=""
 
 # install pacakages
 WORKDIR $WORKDIR
-COPY . $WORKDIR
+COPY requirements.txt $WORKDIR
 
 RUN python -V \
     # create user ID and run mode
@@ -42,5 +42,6 @@ RUN python -V \
     && chmod +x $WORKDIR/run_script.sh 
 
 
+COPY . $WORKDIR
 EXPOSE 9101
 CMD  ./run_script.sh $run_mode
