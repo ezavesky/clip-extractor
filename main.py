@@ -90,10 +90,10 @@ def clip(input_params=None, args=None):
 
     df_scenes = load_scenes(input_vars['path_scenes'])
     if df_scenes is None:
-        df_event = parse_results(input_vars['path_scenes'], verbose=True, parser_type=input_vars['event_type'])
+        df_event = parse_results(input_vars['path_content'], verbose=True, parser_type=input_vars['event_type'])
         df_scenes = event_rle(df_event, score_threshold=input_vars['event_min_score'], 
                                 duration_threshold=input_vars['event_min_length'], 
-                                duration_expand=input_vars['event_expand_length'], align_method='rle')
+                                duration_expand=input_vars['event_expand_length'], peak_method='rle')
 
     if df_scenes is None:
         logger.error(f"Error: No scene sources were provided {input_vars['path_scenes']}, aborting.")
@@ -112,7 +112,7 @@ def clip(input_params=None, args=None):
     logger.info("*p4* (previous input) processing input for regions")
 
     logger.info("*p5* (clip publishing) push of clips to result directory, an S3 bucket, hadoop, azure, etc")
-    rootname = get_clips (path_content, list(df_scenes[["time_begin", "time_end"]]), path_result, profile=input_vars['profile'])
+    rootname = get_clips (path_content, df_scenes[["time_begin", "time_end"]].values.tolist(), path_result, profile=input_vars['profile'])
     logger.info(f"Results in: {rootname}")
 
 
