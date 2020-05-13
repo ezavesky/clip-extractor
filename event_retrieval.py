@@ -42,7 +42,7 @@ def load_scenes(path_scenes):
             assert len(items) == 2, "Expected a pair of numbers"
         return float(items[0]), float(items[1])
 
-    if not path_scenes.exists() or path_scenes.is_dir:
+    if not path_scenes.exists() or path_scenes.is_dir():
         return None
 
     # Read the list of scenes -- one start,stop pair per line

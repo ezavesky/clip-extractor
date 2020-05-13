@@ -90,7 +90,7 @@ def clip(input_params=None, args=None):
 
     df_scenes = load_scenes(input_vars['path_scenes'])
     if df_scenes is None:
-        df_event = parse_results(input_vars['path_content'], verbose=True, parser_type=input_vars['event_type'])
+        df_event = parse_results(input_vars['path_scenes'], verbose=True, parser_type=input_vars['event_type'])
         df_scenes = event_rle(df_event, score_threshold=input_vars['event_min_score'], 
                                 duration_threshold=input_vars['event_min_length'], 
                                 duration_expand=input_vars['event_expand_length'], peak_method='rle')

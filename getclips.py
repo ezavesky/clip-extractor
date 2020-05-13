@@ -77,7 +77,7 @@ def get_clips (input_video, scene_list, output_dir, overwrite=False, profile="de
   
     ext = os.path.splitext(input_video)[1]
     for start,stop in scene_list:
-        clipname = os.path.join (outdirname, f"video.{start}-{stop}{ext}")
+        clipname = os.path.join (outdirname, f"video.{start:.2f}-{stop:.2f}{ext}")
         if overwrite or not os.path.exists (clipname):
             video_cut (input_video, start, stop, clipname, profile_str)
             make_thumbnail (clipname)
