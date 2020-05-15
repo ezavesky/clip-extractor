@@ -28,12 +28,28 @@ import logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-
 import contentai
 import _version
 
 from getclips import get_clips
 from event_retrieval import parse_results, event_rle, load_scenes
+
+import bisect
+
+def do_alignment (metadata_path, align_type, time_tuples, list_of_extractors=None):
+        bounds = parse_results(metadata_path, verbose=True, parser_type=align_type)
+        if list_of_extractors is not None and len(list_of_extractors) > 0:
+            bounds = bounds[bounds['extractor'].isin(list_of_extractors)]
+        starts = sorted(bounds['time_begin'])       # start and stop must be sorted separately b/c of possible overlap
+        stops = sorted(bounds['time_end'])
+        output = []
+        for t_begin, t_end in time_tuples:
+            left = bisect.bisect_left(starts, t_begin) - 1
+            new_begin = starts[left] if left >= 0 else starts[0]
+            right = bisect.bisect_right(stops, t_end)
+            new_end = stops[right] if right < len(stops) else stops[-1]
+            output.append((new_begin, new_end))
+        return output
 
 
 def clip(input_params=None, args=None):
@@ -56,7 +72,7 @@ def clip(input_params=None, args=None):
     """, formatter_class=argparse.RawTextHelpFormatter)
     submain = parser.add_argument_group('main execution and evaluation functionality')
     submain.add_argument('--path_content', type=str, default=contentai.content_path, 
-                            help='input video video (also nested metadata if locally run)')
+                            help='input video')
     submain.add_argument('--path_result', type=str, default=contentai.result_path, 
                             help='output path for generated videos')
     submain.add_argument('--path_scenes', type=str, default="", 
@@ -66,11 +82,13 @@ def clip(input_params=None, args=None):
     submain = parser.add_argument_group('encoding specifications')
     submain.add_argument('--profile', type=str, default='default', help='processing profile to use')
 
-    submain = parser.add_argument_group('what tags and score requirments should be utilized')
+    submain = parser.add_argument_group('what tags and score requirements should be utilized')
     submain.add_argument('--event_type', type=str, default='face', help='what tag_type should be used to identify clips')
     submain.add_argument('--event_min_score', type=float, default=0.8, help='minimum score for encoding')
     submain.add_argument('--event_expand_length', type=float, default=3, help='expand instant events to a minimum of this length')
     submain.add_argument('--event_min_length', type=float, default=10, help='minimum length in seconds for scene selection')
+    submain.add_argument('--alignment_type', type=str, default=None, help='what tag_type should be used for clip alignment')
+    submain.add_argument('--alignment_extractors', nargs='+', default=None, help='use shots only from these extractors during alignment')
 
 
     input_vars = contentai.metadata
@@ -100,7 +118,10 @@ def clip(input_params=None, args=None):
         return
 
     logger.info("*p1* (clip extraction) ffmpeg operation to pull out clips; provide specific processing profiles")
-    time_tuples = df_scenes[["time_begin", "time_end"]].to_dict(orient='split')['data']
+
+    time_tuples = df_scenes[["time_begin", "time_end"]].values.tolist()
+    if input_vars['alignment_type'] != None:
+        time_tuples = do_alignment (input_vars['path_scenes'], input_vars['alignment_type'], time_tuples, list_of_extractors=input_vars['alignment_extractors'])
 
     logger.info("*p2* (clip specification) peak detection and alignment to various input components (e.g. shots, etc)")
 
@@ -112,7 +133,7 @@ def clip(input_params=None, args=None):
     logger.info("*p4* (previous input) processing input for regions")
 
     logger.info("*p5* (clip publishing) push of clips to result directory, an S3 bucket, hadoop, azure, etc")
-    rootname = get_clips (path_content, df_scenes[["time_begin", "time_end"]].values.tolist(), path_result, profile=input_vars['profile'])
+    rootname = get_clips (path_content, time_tuples, path_result, profile=input_vars['profile'])
     logger.info(f"Results in: {rootname}")
 
 
