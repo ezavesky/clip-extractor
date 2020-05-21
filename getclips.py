@@ -6,9 +6,8 @@ from parallel_crop import load_video_cropped_info
 logger = logging.getLogger()
 
 ClipProfiles = {}
-ClipProfiles["default"] = "-y -c copy"
-ClipProfiles["popcorn0"] = "-vf yadif -c:v libx264 -refs 4 -b:v 5M -coder 1 -preset photo -acodec aac -ac 2  -ar 44100  -ab 128k -f mp4"    #preset doesn't work
-ClipProfiles["popcorn"] = "-y -vf yadif -c:v libx264 -refs 4 -b:v 5M -coder 1 -acodec aac -ac 2  -ar 44100  -ab 128k -f mp4"
+ClipProfiles["default"]   = "-y -c copy"
+ClipProfiles["popcorn"]   = "-y -vf yadif -c:v libx264 -refs 4 -b:v 5M -coder 1 -preset ultrafast -acodec aac -ac 2 -ar 44100  -ab 128k -f mp4"
 ClipProfiles["letterbox"] = "-y -vf yadif {} -c:v libx264 -refs 4 -b:v 5M -coder 1 -acodec aac -ac 2  -ar 44100  -ab 128k -f mp4"
 
 
