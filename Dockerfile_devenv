@@ -1,5 +1,5 @@
 #docker build --tag=cai_dev --build-arg user=mtinnemeier --build-arg uid=xxxxx --build-arg gid=30755  -f Dockerfile_devenv .
-#docker run -e TZ=America/New_York --name CAI_DEV -v /n/vmtsr02:/n/vmtsr02 -v /n/vmtsr01:/n/vmtsr01 -it cai_dev
+#docker run -p 8010:8010 -e TZ=America/New_York --name CAI_DEV -v /n/vmtsr02:/n/vmtsr02 -v /n/vmtsr01:/n/vmtsr01 -v /n/docroot10:/n/docroot10 -it cai_dev 
 
 
 
@@ -57,6 +57,13 @@ RUN python -V \
     # && echo "else python -u ./main.py; fi" >> $WORKDIR/run_script.sh \
     && echo "python -u ./main.py" >> $WORKDIR/run_script.sh \
     && chmod +x $WORKDIR/run_script.sh 
+
+
+RUN apt-get install -y iputils-ping && \
+    apt-get install -y procps && \
+    apt-get install -y curl && \
+    apt-get install sudo
+
 
 COPY . $WORKDIR
 
