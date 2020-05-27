@@ -22,6 +22,7 @@ from os import getenv
 import sys
 from pathlib import Path
 import argparse
+import pandas as pd
 
 import logging
 
@@ -31,7 +32,7 @@ logger.setLevel(logging.INFO)
 import contentai
 import _version
 
-from getclips import get_clips
+from getclips import get_clips, get_duration
 from event_retrieval import parse_results, event_rle, load_scenes
 
 import bisect
@@ -89,7 +90,7 @@ def clip(input_params=None, args=None):
     submain.add_argument('--event_min_length', type=float, default=10, help='minimum length in seconds for scene selection')
     submain.add_argument('--alignment_type', type=str, default=None, help='what tag_type should be used for clip alignment')
     submain.add_argument('--alignment_extractors', nargs='+', default=None, help='use shots only from these extractors during alignment')
-
+    submain.add_argument('--clip_bounds', type=float, nargs=2, metavar=('start', 'stop'), help='clip boundaries; negative stop offsets from end', default=None)
 
     input_vars = contentai.metadata
     if args is not None:
@@ -106,16 +107,20 @@ def clip(input_params=None, args=None):
     path_content = Path(input_vars['path_content'])   # start with dir of content
     path_result = Path(input_vars['path_result'])   # destination dir
 
-    df_scenes = load_scenes(input_vars['path_scenes'])
-    if df_scenes is None:
-        df_event = parse_results(input_vars['path_scenes'], verbose=True, parser_type=input_vars['event_type'])
-        df_scenes = event_rle(df_event, score_threshold=input_vars['event_min_score'], 
-                                duration_threshold=input_vars['event_min_length'], 
-                                duration_expand=input_vars['event_expand_length'], peak_method='rle')
-
-    if df_scenes is None:
-        logger.error(f"Error: No scene sources were provided {input_vars['path_scenes']}, aborting.")
-        return
+    if input_vars['clip_bounds'] is not None:
+        if input_vars['clip_bounds'][1] < 0.0:
+            input_vars['clip_bounds'][1] += get_duration(input_vars['path_content'])
+        df_scenes = pd.DataFrame([input_vars['clip_bounds']], columns=["time_begin", "time_end"])
+    else:
+        df_scenes = load_scenes(input_vars['path_scenes'])
+        if df_scenes is None:
+            df_event = parse_results(input_vars['path_scenes'], verbose=True, parser_type=input_vars['event_type'])
+            df_scenes = event_rle(df_event, score_threshold=input_vars['event_min_score'], 
+                                    duration_threshold=input_vars['event_min_length'], 
+                                    duration_expand=input_vars['event_expand_length'], peak_method='rle')
+        if df_scenes is None:
+            logger.error(f"Error: No scene sources were provided {input_vars['path_scenes']}, aborting.")
+            return
 
     logger.info("*p1* (clip extraction) ffmpeg operation to pull out clips; provide specific processing profiles")
 

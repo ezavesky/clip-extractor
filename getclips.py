@@ -65,9 +65,6 @@ def get_clips (input_video, scene_list, output_dir, overwrite=False, profile="de
     outdirname = os.path.join (output_dir, hashed_name)
     if not os.path.exists(outdirname):
         os.makedirs(outdirname, exist_ok=True)
-    elif not overwrite:
-        logger.info (f"already exists: {hashed_name}")
-        return hashed_name
 
     profile_str = ClipProfiles[profile]
     if profile == 'letterbox':
@@ -83,5 +80,12 @@ def get_clips (input_video, scene_list, output_dir, overwrite=False, profile="de
         else:
             logger.info (f"already exists: {clipname}")
     return hashed_name
+
+
+def get_duration (input_video):
+    import subprocess
+    res = subprocess.check_output(f'ffprobe -i {input_video} -show_entries format=duration -v quiet -of csv="p=0"',shell=True)
+    return float(res)
+
 
 
