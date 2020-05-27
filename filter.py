@@ -25,6 +25,8 @@ def filter_crop_dims(list_cropped, threshold, return_list=True):
                 list_results.append(line.strip())
             else:
                 print(line.strip())
+    return list_results
+
 
 if __name__ == '__main__':
     filter_crop_dims(sys.stdin, float(sys.argv[1]), False)

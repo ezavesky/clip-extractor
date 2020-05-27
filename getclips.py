@@ -1,7 +1,7 @@
 import os
 import logging
 
-from parallel_crop import load_video_cropped_info
+from parallel_crop import load_video_cropped_list
 from detect_letter_box import detect_letter_box 
 from adjust_crop import adjust_crop 
 from filter import filter_crop_dims

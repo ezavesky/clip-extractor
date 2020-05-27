@@ -5,6 +5,7 @@ def get_frame_height_width(crop_str):
     width, height, x, y = crop_info.split(':')
     return int(width), int(height), int(x), int(y)
 
+
 def adjust_crop(crop_list, return_list=True):
     is_header = True
     list_result = []
@@ -12,7 +13,10 @@ def adjust_crop(crop_list, return_list=True):
         line = line.strip()
         if is_header:
             is_header = False
-            print(line)
+            if return_list:
+                list_result.append(line)
+            else:
+                print(line)
             continue
         fields = line.strip().split('|')
         video_width = int(fields[-4])
@@ -29,6 +33,7 @@ def adjust_crop(crop_list, return_list=True):
         else:
             print(output_str)
     return list_result
+
 
 if __name__ == '__main__':
     adjust_crop(sys.stdin, return_list=False)

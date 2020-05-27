@@ -33,7 +33,6 @@ def load_video_cropped_list(list_crop):
 def load_video_cropped_info(filename):
     video_cropped_info=[]
     with open(filename, 'rt') as f:
-        is_header = True
         return load_video_cropped_list(f)
 
 

@@ -128,7 +128,7 @@ def clip(input_params=None, args=None):
     logger.info("*p4* (previous input) processing input for regions")
 
     logger.info("*p5* (clip publishing) push of clips to result directory, an S3 bucket, hadoop, azure, etc")
-    rootname = get_clips(path_content, time_tuples, path_result, profile=input_vars['profile'])
+    rootname = get_clips(str(path_content), time_tuples, path_result, profile=input_vars['profile'])
     logger.info(f"Results in: {rootname}")
 
 

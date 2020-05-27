@@ -99,7 +99,7 @@ configuration.
 
 .. code:: shell
 
-   ./run_local.sh 0 --path_video path/video.mp4 --path_result results/ --profile letterbox 
+   ./run_local.sh 0 --path_content path/video.mp4 --path_result results/ --profile letterbox --clip_bounds 5 -5
    ./run_local.sh 1 path/video.mp4 results/ '{"profile":"letterbox"}'
    ./run_local.sh DOCKERIMAGE path/video.mp4 results/ '{"profile":"letterbox"}'
 
