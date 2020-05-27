@@ -178,6 +178,7 @@ Changes
     - alignment of scene path with directory expectation
     - update parameters in README
     - default scene path to be content source path
+    - convert several script and shell commands to pythonic functions
 
 - 1.0.0
     - initial creation

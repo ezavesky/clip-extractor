@@ -49,10 +49,17 @@ def estimate_cropped_height_and_width(ffmpeg_crop_msgs):
     return cropped_width, cropped_height, cropped_x, cropped_y 
 
 
-if __name__ == '__main__':
-    o_f = open(sys.argv[1], 'wt')
-    o_f.write("video_name|crop_info|video_width|video_height|cropped_frame_width|cropped_frame_height\n")
-    for line in sys.stdin:
+def detect_letter_box(list_sources, path_result=None)
+    """list of sources, list of results (or output path); future may change this to dataframe?"""
+    list_result = []
+    str_header = "video_name|crop_info|video_width|video_height|cropped_frame_width|cropped_frame_height\n"
+    if path_result is not None:
+        o_f = open(path_result, 'wt')
+        o_f.write(str_header)
+    else:
+        list_result.append(str_header)
+
+    for line in list_sources:
         video_file = line.strip()
         sys.stderr.write('{}\n'.format(video_file))
 
@@ -64,7 +71,18 @@ if __name__ == '__main__':
             continue
         
         crop_str = 'crop={}:{}:{}:{}'.format(new_frame_width, new_frame_height, x, y)
-        o_f.write('{video_file}|{crop_str}|{video_width}|{video_height}|{new_frame_width}|{new_frame_height}\n'.format(**locals()))
-        o_f.flush()
+        str_result = '{video_file}|{crop_str}|{video_width}|{video_height}|{new_frame_width}|{new_frame_height}\n'.format(**locals())
+        if path_result is not None:
+            o_f.write(str_result)
+            o_f.flush()
+        else:
+            list_result.append(str_result)
 
+    if path_result is None:
+        return list_result
     o_f.close()
+
+
+if __name__ == '__main__':
+    detect_letter_box(sys.stdin, sys.argv[1])
+
