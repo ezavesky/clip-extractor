@@ -27,10 +27,14 @@ more detail in the `main <main.py>`__ script.
 -  ``path_result`` - *(str)* - output path for samples (*default=.*)
 -  ``path_scenes`` - *(str)* - FILE to specify scene begin,end or DIRECTORY with extractor event outputs
 -  ``profile`` - *(string)* - specify a specific transcoding profile for the output video clips
+-  ``overwrite`` - *(flag)* - force overwrite of existing files at result path  (*default=false*)
 -  ``event_type`` - *(string)* - specify an event type to look for in generation (*default=tag*)
 -  ``event_min_score`` - *(float)* - minimum confidence score for a new event to be considered in a scene (*default=0.8*)
 -  ``event_min_length`` - *(float)* - minimum length in seconds for scene selection (*default=10*)
 -  ``event_expand_length`` - *(float)* - expand instant events to a minimum of this length in seconds (*default=3*)
+-  ``alignment_type`` - *(string)* - what tag_type should be used for clip alignment (*default=None*)
+-  ``alignment_extractors`` - *(string list)* - use shots only from these extractors during alignment (*default=None*)
+-  ``clip_bounds`` - *(float, float)* - clip boundaries; negative stop offsets from end (*default=None*)
 
 
 Clip Extractor Operations
@@ -39,11 +43,11 @@ Clip Extractor Operations
 1. Pre-processing - Steps to be determined before any transcoding or clipping is performed.
    
    * Letterbox detection - will use tools to analyze the first N seconds of video and
-     determine if the content is letterboxed.
+     determine if the content is letterboxed.  (profile=letterbox)
 
 2. Transcoding and clipping - All-in-one steps to simultaneously seek to and clip out a region
-   of video.  Here, different profiles are available and can be specified via the ``profiles`` 
-   parmaeter above.
+   of video.  Here, different profiles are available and can be specified via the ``profile`` 
+   paremeter above.
    
    * TBD
    * TBD 2
@@ -169,4 +173,10 @@ Changes
 1.0
 ---
 
-- initial creation
+- 1.0.1
+    - fixes for windows
+    - alignment of scene path with directory expectation
+    - update parameters in README
+
+- 1.0.0
+    - initial creation

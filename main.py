@@ -38,19 +38,19 @@ from event_retrieval import parse_results, event_rle, load_scenes
 import bisect
 
 def do_alignment (metadata_path, align_type, time_tuples, list_of_extractors=None):
-        bounds = parse_results(metadata_path, verbose=True, parser_type=align_type)
-        if list_of_extractors is not None and len(list_of_extractors) > 0:
-            bounds = bounds[bounds['extractor'].isin(list_of_extractors)]
-        starts = sorted(bounds['time_begin'])       # start and stop must be sorted separately b/c of possible overlap
-        stops = sorted(bounds['time_end'])
-        output = []
-        for t_begin, t_end in time_tuples:
-            left = bisect.bisect_left(starts, t_begin) - 1
-            new_begin = starts[left] if left >= 0 else starts[0]
-            right = bisect.bisect_right(stops, t_end)
-            new_end = stops[right] if right < len(stops) else stops[-1]
-            output.append((new_begin, new_end))
-        return output
+    bounds = parse_results(metadata_path, verbose=True, parser_type=align_type)
+    if list_of_extractors is not None and len(list_of_extractors) > 0:
+        bounds = bounds[bounds['extractor'].isin(list_of_extractors)]
+    starts = sorted(bounds['time_begin'])       # start and stop must be sorted separately b/c of possible overlap
+    stops = sorted(bounds['time_end'])
+    output = []
+    for t_begin, t_end in time_tuples:
+        left = bisect.bisect_left(starts, t_begin) - 1
+        new_begin = starts[left] if left >= 0 else starts[0]
+        right = bisect.bisect_right(stops, t_end)
+        new_end = stops[right] if right < len(stops) else stops[-1]
+        output.append((new_begin, new_end))
+    return output
 
 
 def clip(input_params=None, args=None):
@@ -82,6 +82,7 @@ def clip(input_params=None, args=None):
 
     submain = parser.add_argument_group('encoding specifications')
     submain.add_argument('--profile', type=str, default='default', help='processing profile to use')
+    submain.add_argument('--overwrite', default=False, action='store_true', help='force overwrite of existing files')
 
     submain = parser.add_argument_group('what tags and score requirements should be utilized')
     submain.add_argument('--event_type', type=str, default='face', help='what tag_type should be used to identify clips')
@@ -106,15 +107,18 @@ def clip(input_params=None, args=None):
 
     path_content = Path(input_vars['path_content'])   # start with dir of content
     path_result = Path(input_vars['path_result'])   # destination dir
+    path_scenes = Path(input_vars['path_scenes'])   # destination dir
+    if len(input_vars['path_scenes']) == 0:   # no scene path, use same as content
+        path_scenes = path_content
 
     if input_vars['clip_bounds'] is not None:
         if input_vars['clip_bounds'][1] < 0.0:
             input_vars['clip_bounds'][1] += get_duration(input_vars['path_content'])
         df_scenes = pd.DataFrame([input_vars['clip_bounds']], columns=["time_begin", "time_end"])
     else:
-        df_scenes = load_scenes(input_vars['path_scenes'])
+        df_scenes = load_scenes(str(path_scenes))
         if df_scenes is None:
-            df_event = parse_results(input_vars['path_scenes'], verbose=True, parser_type=input_vars['event_type'])
+            df_event = parse_results(str(path_scenes.parent), verbose=True, parser_type=input_vars['event_type'])
             df_scenes = event_rle(df_event, score_threshold=input_vars['event_min_score'], 
                                     duration_threshold=input_vars['event_min_length'], 
                                     duration_expand=input_vars['event_expand_length'], peak_method='rle')
@@ -126,7 +130,8 @@ def clip(input_params=None, args=None):
 
     time_tuples = df_scenes[["time_begin", "time_end"]].values.tolist()
     if input_vars['alignment_type'] != None:
-        time_tuples = do_alignment (input_vars['path_scenes'], input_vars['alignment_type'], time_tuples, list_of_extractors=input_vars['alignment_extractors'])
+        time_tuples = do_alignment(str(path_scenes.parent), input_vars['alignment_type'], time_tuples, 
+                                   overwrite=input_vars['overwrite'], list_of_extractors=input_vars['alignment_extractors'])
 
     logger.info("*p2* (clip specification) peak detection and alignment to various input components (e.g. shots, etc)")
 
@@ -138,7 +143,7 @@ def clip(input_params=None, args=None):
     logger.info("*p4* (previous input) processing input for regions")
 
     logger.info("*p5* (clip publishing) push of clips to result directory, an S3 bucket, hadoop, azure, etc")
-    rootname = get_clips (path_content, time_tuples, path_result, profile=input_vars['profile'])
+    rootname = get_clips(path_content, time_tuples, path_result, profile=input_vars['profile'])
     logger.info(f"Results in: {rootname}")
 
 
