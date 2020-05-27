@@ -167,6 +167,22 @@ def event_rle(df, score_threshold=0.8, duration_threshold=10, duration_expand=3,
     return df_segments.reset_index(drop=True)
 
 
+def event_alignment (metadata_path, align_type, time_tuples, list_of_extractors=None):
+    bounds = parse_results(metadata_path, verbose=True, parser_type=align_type)
+    if list_of_extractors is not None and len(list_of_extractors) > 0:
+        bounds = bounds[bounds['extractor'].isin(list_of_extractors)]
+    starts = sorted(bounds['time_begin'])       # start and stop must be sorted separately b/c of possible overlap
+    stops = sorted(bounds['time_end'])
+    output = []
+    for t_begin, t_end in time_tuples:
+        left = bisect.bisect_left(starts, t_begin) - 1
+        new_begin = starts[left] if left >= 0 else starts[0]
+        right = bisect.bisect_right(stops, t_end)
+        new_end = stops[right] if right < len(stops) else stops[-1]
+        output.append((new_begin, new_end))
+    return output
+
+
 if __name__ == "__main__":
     # TODO: erase this when further developed
     path_execute = Path(__file__).parent

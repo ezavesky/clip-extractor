@@ -33,24 +33,9 @@ import contentai
 import _version
 
 from getclips import get_clips, get_duration
-from event_retrieval import parse_results, event_rle, load_scenes
+from event_retrieval import parse_results, event_rle, load_scenes, event_alignment
 
 import bisect
-
-def do_alignment (metadata_path, align_type, time_tuples, list_of_extractors=None):
-    bounds = parse_results(metadata_path, verbose=True, parser_type=align_type)
-    if list_of_extractors is not None and len(list_of_extractors) > 0:
-        bounds = bounds[bounds['extractor'].isin(list_of_extractors)]
-    starts = sorted(bounds['time_begin'])       # start and stop must be sorted separately b/c of possible overlap
-    stops = sorted(bounds['time_end'])
-    output = []
-    for t_begin, t_end in time_tuples:
-        left = bisect.bisect_left(starts, t_begin) - 1
-        new_begin = starts[left] if left >= 0 else starts[0]
-        right = bisect.bisect_right(stops, t_end)
-        new_end = stops[right] if right < len(stops) else stops[-1]
-        output.append((new_begin, new_end))
-    return output
 
 
 def clip(input_params=None, args=None):
@@ -130,8 +115,8 @@ def clip(input_params=None, args=None):
 
     time_tuples = df_scenes[["time_begin", "time_end"]].values.tolist()
     if input_vars['alignment_type'] != None:
-        time_tuples = do_alignment(str(path_scenes.parent), input_vars['alignment_type'], time_tuples, 
-                                   overwrite=input_vars['overwrite'], list_of_extractors=input_vars['alignment_extractors'])
+        time_tuples = event_alignment(str(path_scenes.parent), input_vars['alignment_type'], time_tuples, 
+                                      overwrite=input_vars['overwrite'], list_of_extractors=input_vars['alignment_extractors'])
 
     logger.info("*p2* (clip specification) peak detection and alignment to various input components (e.g. shots, etc)")
 

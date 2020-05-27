@@ -25,7 +25,7 @@ more detail in the `main <main.py>`__ script.
 -  ``verbose`` - *(bool)* - verbose input/output configuration printing (*default=false*)
 -  ``path_content`` - *(str)* - input video path for files to label (*default=video.mp4*)
 -  ``path_result`` - *(str)* - output path for samples (*default=.*)
--  ``path_scenes`` - *(str)* - FILE to specify scene begin,end or DIRECTORY with extractor event outputs
+-  ``path_scenes`` - *(str)* - FILE to specify scene begin,end or DIRECTORY with extractor event outputs (*default=``path_content``*)
 -  ``profile`` - *(string)* - specify a specific transcoding profile for the output video clips
 -  ``overwrite`` - *(flag)* - force overwrite of existing files at result path  (*default=false*)
 -  ``event_type`` - *(string)* - specify an event type to look for in generation (*default=tag*)
@@ -174,9 +174,10 @@ Changes
 ---
 
 - 1.0.1
-    - fixes for windows
+    - fixes for windows and ffmpeg
     - alignment of scene path with directory expectation
     - update parameters in README
+    - default scene path to be content source path
 
 - 1.0.0
     - initial creation
