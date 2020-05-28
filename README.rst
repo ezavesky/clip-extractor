@@ -25,12 +25,16 @@ more detail in the `main <main.py>`__ script.
 -  ``verbose`` - *(bool)* - verbose input/output configuration printing (*default=false*)
 -  ``path_content`` - *(str)* - input video path for files to label (*default=video.mp4*)
 -  ``path_result`` - *(str)* - output path for samples (*default=.*)
--  ``path_scenes`` - *(str)* - FILE to specify scene begin,end or DIRECTORY with extractor event outputs
+-  ``path_scenes`` - *(str)* - FILE to specify scene begin,end or DIRECTORY with extractor event outputs (*default=``path_content``*)
 -  ``profile`` - *(string)* - specify a specific transcoding profile for the output video clips
+-  ``overwrite`` - *(flag)* - force overwrite of existing files at result path  (*default=false*)
 -  ``event_type`` - *(string)* - specify an event type to look for in generation (*default=tag*)
 -  ``event_min_score`` - *(float)* - minimum confidence score for a new event to be considered in a scene (*default=0.8*)
 -  ``event_min_length`` - *(float)* - minimum length in seconds for scene selection (*default=10*)
 -  ``event_expand_length`` - *(float)* - expand instant events to a minimum of this length in seconds (*default=3*)
+-  ``alignment_type`` - *(string)* - what tag_type should be used for clip alignment (*default=None*)
+-  ``alignment_extractors`` - *(string list)* - use shots only from these extractors during alignment (*default=None*)
+-  ``clip_bounds`` - *(float, float)* - clip boundaries; negative stop offsets from end (*default=None*)
 
 
 Clip Extractor Operations
@@ -39,11 +43,11 @@ Clip Extractor Operations
 1. Pre-processing - Steps to be determined before any transcoding or clipping is performed.
    
    * Letterbox detection - will use tools to analyze the first N seconds of video and
-     determine if the content is letterboxed.
+     determine if the content is letterboxed.  (profile=letterbox)
 
 2. Transcoding and clipping - All-in-one steps to simultaneously seek to and clip out a region
-   of video.  Here, different profiles are available and can be specified via the ``profiles`` 
-   parmaeter above.
+   of video.  Here, different profiles are available and can be specified via the ``profile`` 
+   paremeter above.
    
    * TBD
    * TBD 2
@@ -95,7 +99,7 @@ configuration.
 
 .. code:: shell
 
-   ./run_local.sh 0 --path_video path/video.mp4 --path_result results/ --profile letterbox 
+   ./run_local.sh 0 --path_content path/video.mp4 --path_result results/ --profile letterbox --clip_bounds 5 -5
    ./run_local.sh 1 path/video.mp4 results/ '{"profile":"letterbox"}'
    ./run_local.sh DOCKERIMAGE path/video.mp4 results/ '{"profile":"letterbox"}'
 
@@ -169,4 +173,12 @@ Changes
 1.0
 ---
 
-- initial creation
+- 1.0.1
+    - fixes for windows and ffmpeg
+    - alignment of scene path with directory expectation
+    - update parameters in README
+    - default scene path to be content source path
+    - convert several script and shell commands to pythonic functions
+
+- 1.0.0
+    - initial creation

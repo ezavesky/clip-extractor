@@ -20,7 +20,7 @@
 
 def version():
     return {
-        'version': "1.0.0",
+        'version': "1.0.1",
         'package': "clip_extractor",
         'description': "a clip extraction service for certain quality profiles and post processing",
         'copyright': "Copyright AT&T Services and Warner Media 2020",
