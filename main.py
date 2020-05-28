@@ -116,7 +116,7 @@ def clip(input_params=None, args=None):
     time_tuples = df_scenes[["time_begin", "time_end"]].values.tolist()
     if input_vars['alignment_type'] != None:
         time_tuples = event_alignment(str(path_scenes.parent), input_vars['alignment_type'], time_tuples, 
-                                      overwrite=input_vars['overwrite'], list_of_extractors=input_vars['alignment_extractors'])
+                                      list_of_extractors=input_vars['alignment_extractors'])
 
     logger.info("*p2* (clip specification) peak detection and alignment to various input components (e.g. shots, etc)")
 
@@ -128,7 +128,7 @@ def clip(input_params=None, args=None):
     logger.info("*p4* (previous input) processing input for regions")
 
     logger.info("*p5* (clip publishing) push of clips to result directory, an S3 bucket, hadoop, azure, etc")
-    rootname = get_clips(str(path_content), time_tuples, path_result, profile=input_vars['profile'])
+    rootname = get_clips(str(path_content), time_tuples, path_result, profile=input_vars['profile'], overwrite=input_vars['overwrite'])
     logger.info(f"Results in: {rootname}")
 
 
