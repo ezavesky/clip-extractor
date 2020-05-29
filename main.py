@@ -35,8 +35,6 @@ import _version
 from getclips import get_clips, get_duration
 from event_retrieval import parse_results, event_rle, load_scenes, event_alignment
 
-import bisect
-
 
 def clip(input_params=None, args=None):
     # extract data from contentai.content_url
@@ -76,7 +74,7 @@ def clip(input_params=None, args=None):
     submain.add_argument('--event_min_length', type=float, default=10, help='minimum length in seconds for scene selection')
     submain.add_argument('--alignment_type', type=str, default=None, help='what tag_type should be used for clip alignment')
     submain.add_argument('--alignment_extractors', nargs='+', default=None, help='use shots only from these extractors during alignment')
-    submain.add_argument('--clip_bounds', type=float, nargs=2, metavar=('start', 'stop'), help='clip boundaries; negative stop offsets from end', default=None)
+    submain.add_argument('--clip_bounds', type=float, nargs=2, metavar=('start', 'stop'), help='clip boundaries; negative stop trims from end', default=None)
 
     input_vars = contentai.metadata
     if args is not None:
@@ -90,20 +88,25 @@ def clip(input_params=None, args=None):
     logger.info(f"Received parameters: {input_vars}")
     logger.info(f"Running Version: {version_info}")
 
-    path_content = Path(input_vars['path_content'])   # start with dir of content
+    path_video = Path(input_vars['path_content'])   # path to a video file
     path_result = Path(input_vars['path_result'])   # destination dir
-    path_scenes = Path(input_vars['path_scenes'])   # destination dir
-    if len(input_vars['path_scenes']) == 0:   # no scene path, use same as content
-        path_scenes = path_content
+    path_scenes = Path(input_vars['path_scenes'])   # alternate scenes data (could be file or dir)
 
-    if input_vars['clip_bounds'] is not None:
+    def meta_path ():       # metadata path is only calculated when needed
+        if path_scenes.is_dir():
+            meta = path_scenes
+        else:
+            meta = path_video.parent
+        return str(meta)
+
+    if input_vars['clip_bounds'] is not None:       # this overrides any other scene designations
         if input_vars['clip_bounds'][1] < 0.0:
-            input_vars['clip_bounds'][1] += get_duration(input_vars['path_content'])
+            input_vars['clip_bounds'][1] += get_duration(path_video)
         df_scenes = pd.DataFrame([input_vars['clip_bounds']], columns=["time_begin", "time_end"])
     else:
         df_scenes = load_scenes(str(path_scenes))
         if df_scenes is None:
-            df_event = parse_results(str(path_scenes.parent), verbose=True, parser_type=input_vars['event_type'])
+            df_event = parse_results(meta_path(), verbose=True, parser_type=input_vars['event_type'])
             df_scenes = event_rle(df_event, score_threshold=input_vars['event_min_score'], 
                                     duration_threshold=input_vars['event_min_length'], 
                                     duration_expand=input_vars['event_expand_length'], peak_method='rle')
@@ -115,7 +118,7 @@ def clip(input_params=None, args=None):
 
     time_tuples = df_scenes[["time_begin", "time_end"]].values.tolist()
     if input_vars['alignment_type'] != None:
-        time_tuples = event_alignment(str(path_scenes.parent), input_vars['alignment_type'], time_tuples, 
+        time_tuples = event_alignment(meta_path(), input_vars['alignment_type'], time_tuples, 
                                       list_of_extractors=input_vars['alignment_extractors'])
 
     logger.info("*p2* (clip specification) peak detection and alignment to various input components (e.g. shots, etc)")
@@ -128,7 +131,7 @@ def clip(input_params=None, args=None):
     logger.info("*p4* (previous input) processing input for regions")
 
     logger.info("*p5* (clip publishing) push of clips to result directory, an S3 bucket, hadoop, azure, etc")
-    rootname = get_clips(str(path_content), time_tuples, path_result, profile=input_vars['profile'], overwrite=input_vars['overwrite'])
+    rootname = get_clips(str(path_video), time_tuples, path_result, profile=input_vars['profile'], overwrite=input_vars['overwrite'])
     logger.info(f"Results in: {rootname}")
 
 

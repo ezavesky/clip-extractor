@@ -24,6 +24,7 @@ from pathlib import Path
 import glob  # for model listing
 from datetime import datetime
 import json
+import bisect
 
 import logging
 
@@ -169,6 +170,7 @@ def event_rle(df, score_threshold=0.8, duration_threshold=10, duration_expand=3,
 
 def event_alignment (metadata_path, align_type, time_tuples, list_of_extractors=None):
     bounds = parse_results(metadata_path, verbose=True, parser_type=align_type)
+    assert bounds is not None, f"No entries for alignment type '{align_type}'"
     if list_of_extractors is not None and len(list_of_extractors) > 0:
         bounds = bounds[bounds['extractor'].isin(list_of_extractors)]
     starts = sorted(bounds['time_begin'])       # start and stop must be sorted separately b/c of possible overlap
