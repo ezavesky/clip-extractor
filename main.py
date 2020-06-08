@@ -67,7 +67,7 @@ def clip(input_params=None, args=None):
     submain.add_argument('--csv_file', dest='csv_file', default='', type=str, help='also write output records to this CSV file')
 
     submain = parser.add_argument_group('encoding/output specifications')
-    submain.add_argument('--profile', type=str, default='default', help='processing profile to use (specify "list" for available list)')
+    submain.add_argument('--profile', type=str, default='none', help='processing profile to use (specify "list" for available list)')
     submain.add_argument('--overwrite', default=False, action='store_true', help='force overwrite of existing files')
 
     submain = parser.add_argument_group('scene detection specifications')
