@@ -175,22 +175,32 @@ def event_rle(df, score_threshold=0.8, duration_threshold=10, duration_expand=3,
     return df_segments.reset_index(drop=True)
 
 
-def event_alignment (df_events, df_scenes):
-    starts = sorted(df_events['time_begin'])       # start and stop must be sorted separately b/c of possible overlap
-    stops = sorted(df_events['time_end'])
+def event_alignment(df_events, df_scenes, max_duration=-1):
+    df_starts = df_events.sort_values('time_begin')       # start and stop must be sorted separately b/c of possible overlap
+    df_ends = df_events.sort_values('time_end')
     list_return = []
     for idx, row in df_scenes.iterrows():
         new_row = row.copy()   # copy to a new working row
-        left = bisect.bisect_left(starts, row['time_begin']) - 1
-        new_row['time_begin'] = starts[left] if left >= 0 else starts[0]
-        # TODO: save left TAG information
+        new_row['event_begin'] = {}
+        new_row['event_end'] = {}
+        # print(new_row)
 
-        right = bisect.bisect_right(stops, row['time_end'])
-        new_row['time_end'] = stops[right] if right < len(stops) else stops[-1]
-        # TODO: specify left TAG information
+        left = df_starts["time_begin"].searchsorted(row['time_begin'], side='left')
+        if left >= 0:
+            new_row['time_begin'] = df_starts.iloc[left]['time_begin']
+            new_row['event_begin'] = df_starts.iloc[left].to_dict()   # save the begin event info
+        
+        time_end = row['time_end']
+        if max_duration > 0:   # apply duration limiter
+            time_end = min(time_end, new_row['time_begin'] + max_duration)
+        right = df_ends["time_end"].searchsorted(row['time_end'], side='right')
+        # print("END", row['time_end'], new_row['time_end'], right, len(df_ends))
+        if right < len(df_ends):
+            new_row['time_end'] = df_ends.iloc[right]['time_end']
+            new_row['event_end'] = df_ends.iloc[right].to_dict()   # save the END event info
 
-        output.append(new_row)
-    return pd.DataFrame(output)
+        list_return.append(new_row)
+    return pd.DataFrame(list_return)
 
 
 if __name__ == "__main__":
