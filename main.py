@@ -63,18 +63,21 @@ def clip(input_params=None, args=None):
                             help='FILE to specify scene begin,end or DIRECTORY with extractor event outputs')
     submain.add_argument('--verbose', dest='verbose', default=False, action='store_true', help='verbosely print operations')
 
-    submain = parser.add_argument_group('encoding specifications')
-    submain.add_argument('--profile', type=str, default='default', help='processing profile to use')
+    submain = parser.add_argument_group('encoding/output specifications')
+    submain.add_argument('--profile', type=str, default='default', help='processing profile to use (specify "list" for available list)')
     submain.add_argument('--overwrite', default=False, action='store_true', help='force overwrite of existing files')
 
-    submain = parser.add_argument_group('what tags and score requirements should be utilized')
+    submain = parser.add_argument_group('scene detection specifications')
     submain.add_argument('--event_type', type=str, default='face', help='what tag_type should be used to identify clips')
     submain.add_argument('--event_min_score', type=float, default=0.8, help='minimum score for encoding')
     submain.add_argument('--event_expand_length', type=float, default=3, help='expand instant events to a minimum of this length')
-    submain.add_argument('--event_min_length', type=float, default=10, help='minimum length in seconds for scene selection')
+    submain.add_argument('--event_min_length', type=float, default=10, help='minimum length in seconds for event scene selection')
+    submain.add_argument('--clip_bounds', type=float, nargs=2, metavar=('start', 'stop'), help='fixed scene timing (instead of events); start/stop (10 36) or negative stop trims from end (10 -10)', default=None)
+    submain.add_argument('--max_duration', type=float, default=-1, help='max duration in seconds from scene selction or clip specification (-1 disables)')
+
+    submain = parser.add_argument_group('final alignment specifications')
     submain.add_argument('--alignment_type', type=str, default=None, help='what tag_type should be used for clip alignment')
     submain.add_argument('--alignment_extractors', nargs='+', default=None, help='use shots only from these extractors during alignment')
-    submain.add_argument('--clip_bounds', type=float, nargs=2, metavar=('start', 'stop'), help='clip boundaries; negative stop trims from end', default=None)
 
     input_vars = contentai.metadata
     if args is not None:
@@ -99,9 +102,14 @@ def clip(input_params=None, args=None):
             meta = path_video.parent
         return str(meta)
 
+    logger.info("*p1* (asset extraction) ffmpeg operation to pull out clips; provide specific processing profiles")
+
+    logger.info("*p2* (clip specification) peak detection and alignment to various input components (e.g. shots, etc)")
     if input_vars['clip_bounds'] is not None:       # this overrides any other scene designations
         if input_vars['clip_bounds'][1] < 0.0:
             input_vars['clip_bounds'][1] += get_duration(path_video)
+        if input_vars['max_duration'] > 0.0:   # if max duration passed, hard-limit response
+            input_vars['clip_bounds'][1] = min(input_vars['clip_bounds'][0] + input_vars['max_duration'],  input_vars['clip_bounds'][1])
         df_scenes = pd.DataFrame([input_vars['clip_bounds']], columns=["time_begin", "time_end"])
     else:
         df_scenes = load_scenes(str(path_scenes))
@@ -109,29 +117,30 @@ def clip(input_params=None, args=None):
             df_event = parse_results(meta_path(), verbose=True, parser_type=input_vars['event_type'])
             df_scenes = event_rle(df_event, score_threshold=input_vars['event_min_score'], 
                                     duration_threshold=input_vars['event_min_length'], 
-                                    duration_expand=input_vars['event_expand_length'], peak_method='rle')
+                                    duration_expand=input_vars['event_expand_length'], peak_method='rle',
+                                    max_duration=input_vars['max_duration'])
         if df_scenes is None:
             logger.error(f"Error: No scene sources were provided {input_vars['path_scenes']}, aborting.")
             return
 
-    logger.info("*p1* (clip extraction) ffmpeg operation to pull out clips; provide specific processing profiles")
+    logger.info("*p3a* (quality assessment) quality evaluation of frames or video for refined boundaries")
 
-    time_tuples = df_scenes[["time_begin", "time_end"]].values.tolist()
-    if input_vars['alignment_type'] != None:
-        time_tuples = event_alignment(meta_path(), input_vars['alignment_type'], time_tuples, 
-                                      list_of_extractors=input_vars['alignment_extractors'])
-
-    logger.info("*p2* (clip specification) peak detection and alignment to various input components (e.g. shots, etc)")
-
-    logger.info("*p3* (quality assessment) quality evaluation of frames or video for refined boundaries")
-    logger.info("*p3* (moderation assessment) quality evaluation of frames or video for refined boundaries")
+    logger.info("*p3b* (moderation assessment) quality evaluation of frames or video for refined boundaries")
 
     logger.info("*p3* (trimming refinement) refinement based on quality requirements (if any)")
+    if input_vars['alignment_type'] != None:
+        df_event = parse_results(meta_path(), verbose=True, parser_type=input_vars['alignment_type'], 
+                                 extractor_list=input_vars['alignment_extractors'])
+        if df_event is None or len(df_event) == 0:
+            logger.warning(f"Warning: Requested specific alignment type '{input_vars['alignment_type']}' but no events fonud.")
+        else:
+            df_scenes = event_alignment(df_event, df_scenes)
 
     logger.info("*p4* (previous input) processing input for regions")
+    time_tuples = df_scenes[["time_begin", "time_end"]].values.tolist()
+    rootname = get_clips(str(path_video), time_tuples, path_result, profile=input_vars['profile'], overwrite=input_vars['overwrite'])
 
     logger.info("*p5* (clip publishing) push of clips to result directory, an S3 bucket, hadoop, azure, etc")
-    rootname = get_clips(str(path_video), time_tuples, path_result, profile=input_vars['profile'], overwrite=input_vars['overwrite'])
     logger.info(f"Results in: {rootname}")
 
 

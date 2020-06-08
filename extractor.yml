@@ -1,6 +1,6 @@
 name: dsai_clip_extractor
 
-description: This extractor uses generated shots or segments to generate clips and keyframes for consumption.
+description: A clip extraction service given input scenes and events; can also output for certain quality profiles and post processing
 
 url: "https://gitlab.research.att.com/turnercode/clip-extractor"
 
