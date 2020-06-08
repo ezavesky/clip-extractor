@@ -1,23 +1,27 @@
 import os
 import logging
-from parallel_crop import load_video_cropped_info
 
+from parallel_crop import load_video_cropped_list
+from detect_letter_box import detect_letter_box 
+from adjust_crop import adjust_crop 
+from filter import filter_crop_dims
 
 logger = logging.getLogger()
 
 ClipProfiles = {}
 ClipProfiles["default"]   = "-y -c copy"
 ClipProfiles["popcorn"]   = "-y -vf yadif -c:v libx264 -refs 4 -b:v 5M -coder 1 -preset ultrafast -acodec aac -ac 2 -ar 44100  -ab 128k -f mp4"
+ClipProfiles["small"]     = "-y -vf yadif -c:v libx264 -refs 4 -b:v 2M -coder 1 -preset ultrafast -acodec aac -ac 2 -ar 44100  -ab 128k -f mp4"
 ClipProfiles["letterbox"] = "-y -vf yadif {} -c:v libx264 -refs 4 -b:v 5M -coder 1 -acodec aac -ac 2  -ar 44100  -ab 128k -f mp4"
 
 
-
 def find_crop_coordinates (filename):
-    os.system (f"echo {filename} > video_list.txt")
-    os.system("cat video_list.txt | python detect_letter_box.py crop_info.txt")
-    os.system("cat crop_info.txt | python filter.py 20 > crop_filtered.txt")
-    os.system("cat crop_filtered.txt | python adjust_crop.py > crop_adjusted.txt")
-    crop_info = load_video_cropped_info("crop_adjusted.txt")
+    list_crop = detect_letter_box([filename])
+    list_crop_filter = filter_crop_dims(list_crop, 20)
+    list_adjusted = adjust_crop(list_crop_filter)
+    crop_info = load_video_cropped_list(list_adjusted)
+    if len(crop_info) == 0 or len(crop_info[0]) < 2:
+        return ""
     return "-vf " + crop_info[0][1]
 
 

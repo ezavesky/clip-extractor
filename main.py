@@ -33,7 +33,7 @@ import contentai
 import _version
 
 from getclips import get_clips, get_duration
-from event_retrieval import parse_results, event_rle, load_scenes
+from event_retrieval import parse_results, event_rle, load_scenes, event_alignment
 
 import bisect
 
@@ -87,6 +87,7 @@ def clip(input_params=None, args=None):
 
     submain = parser.add_argument_group('encoding specifications')
     submain.add_argument('--profile', type=str, default='default', help='processing profile to use')
+    submain.add_argument('--overwrite', default=False, action='store_true', help='force overwrite of existing files')
 
     submain = parser.add_argument_group('what tags and score requirements should be utilized')
     submain.add_argument('--event_type', type=str, default='face', help='what tag_type should be used to identify clips')
@@ -113,15 +114,23 @@ def clip(input_params=None, args=None):
     logger.info(f"Received parameters: {input_vars}")
     logger.info(f"Running Version: {version_info}")
 
-    path_content = Path(input_vars['path_content'])   # start with dir of content
+    path_video = Path(input_vars['path_content'])   # path to a video file
     path_result = Path(input_vars['path_result'])   # destination dir
+    path_scenes = Path(input_vars['path_scenes'])   # alternate scenes data (could be file or dir)
 
-    if input_vars['clip_bounds'] is not None:
+    def meta_path ():       # metadata path is only calculated when needed
+        if path_scenes.is_dir():
+            meta = path_scenes
+        else:
+            meta = path_video.parent
+        return str(meta)
+
+    if input_vars['clip_bounds'] is not None:       # this overrides any other scene designations
         if input_vars['clip_bounds'][1] < 0.0:
-            input_vars['clip_bounds'][1] += get_duration(input_vars['path_content'])
+            input_vars['clip_bounds'][1] += get_duration(path_video)
         df_scenes = pd.DataFrame([input_vars['clip_bounds']], columns=["time_begin", "time_end"])
     else:
-        df_scenes = load_scenes(input_vars['path_scenes'])
+        df_scenes = load_scenes(str(path_scenes))
         if df_scenes is None:
             dir_scene = Path(input_vars['path_scenes']).parent
             dir_scene = str(dir_scene)
@@ -137,11 +146,9 @@ def clip(input_params=None, args=None):
 
     time_tuples = df_scenes[["time_begin", "time_end"]].values.tolist()
     if input_vars['alignment_type'] != None:
-        ## this was fixed so it would work with a clip_bounds input
-        dir_scene = Path(input_vars['path_content']).parent
-        dir_scene = str(dir_scene)
-        time_tuples = do_alignment (dir_scene, input_vars['alignment_type'], time_tuples, list_of_extractors=input_vars['alignment_extractors'])
-    
+        time_tuples = event_alignment(meta_path(), input_vars['alignment_type'], time_tuples, 
+                                      list_of_extractors=input_vars['alignment_extractors'])
+
     logger.info("*p2* (clip specification) peak detection and alignment to various input components (e.g. shots, etc)")
 
     logger.info("*p3* (quality assessment) quality evaluation of frames or video for refined boundaries")
@@ -152,8 +159,7 @@ def clip(input_params=None, args=None):
     logger.info("*p4* (previous input) processing input for regions")
 
     logger.info("*p5* (clip publishing) push of clips to result directory, an S3 bucket, hadoop, azure, etc")
-
-    rootname = get_clips (path_content, time_tuples, path_result, profile=input_vars['profile'])
+    rootname = get_clips(str(path_video), time_tuples, path_result, profile=input_vars['profile'], overwrite=input_vars['overwrite'])
     logger.info(f"Results in: {rootname}")
 
     logger.info("*p6* (csv export) exporting cut times to csv file")
