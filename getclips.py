@@ -9,6 +9,7 @@ from filter import filter_crop_dims
 logger = logging.getLogger()
 
 ClipProfiles = {}
+ClipProfiles["none"]      = ""
 ClipProfiles["default"]   = "-y -c copy"
 ClipProfiles["popcorn"]   = "-y -vf yadif -c:v libx264 -refs 4 -b:v 5M -coder 1 -preset ultrafast -acodec aac -ac 2 -ar 44100  -ab 128k -f mp4"
 ClipProfiles["small"]     = "-y -vf yadif -c:v libx264 -refs 4 -b:v 2M -coder 1 -preset ultrafast -acodec aac -ac 2 -ar 44100  -ab 128k -f mp4"
@@ -46,6 +47,23 @@ def make_thumbnail (fname, posn=1):
         success = False
     return success
 
+def validate_profile(profile_name='list'):
+    """Helper to validate a profile or to list them with the special name 'list'..."""
+    if profile_name == 'list':
+        logger.info("\nAvailable profiles within the clip extractor...")
+        for name in ClipProfiles:
+            profile_str = ClipProfiles[name]
+            if len(profile_str):
+                logger.info(f"    [{name}] - ffmpeg -i INPUT {ClipProfiles[name]} OUTPUT")
+            else:
+                logger.info(f"    [{name}] - (no output files will be generated)")
+        return False
+
+    if profile_name not in ClipProfiles:
+        logger.warning(f"Profile '{profile_name}' not in known list of encoding profiles, skipping output generation.")
+        return False
+    return True
+
 
 # from https://stackoverflow.com/questions/1131220/get-md5-hash-of-big-files-in-python
 def videofile_md5(filename, chunk_size=65536):
@@ -61,16 +79,24 @@ def videofile_md5(filename, chunk_size=65536):
 
 
 def get_clips (input_video, scene_list, output_dir, overwrite=False, profile="default"):
+    list_clips = []
+    if not validate_profile(profile):
+        return list_clips
+
+    profile_str = ClipProfiles[profile]
+    if len(profile_str) == 0:   # empty or non-generating profile
+        logger.info (f"Clip generation skipped with profile: {profile}")
+        return list_clips
+        
     try:
         hashed_name = videofile_md5(input_video) 
     except Exception as err:
         logger.error (f"get_clips {input_video}: {err}")
-        return None
+        return list_clips
     outdirname = os.path.join (output_dir, hashed_name)
     if not os.path.exists(outdirname):
         os.makedirs(outdirname, exist_ok=True)
 
-    profile_str = ClipProfiles[profile]
     if profile == 'letterbox':
         mod = find_crop_coordinates (input_video)  # returns ffmpeg syntax
         profile_str = profile_str.format(mod)
@@ -82,8 +108,9 @@ def get_clips (input_video, scene_list, output_dir, overwrite=False, profile="de
             video_cut (input_video, start, stop, clipname, profile_str)
             make_thumbnail (clipname)
         else:
-            logger.info (f"already exists: {clipname}")
-    return hashed_name
+            logger.info (f"Skipping already existing: {clipname}")
+        list_clips.append(clipname)
+    return list_clips
 
 
 def get_duration (input_video):
