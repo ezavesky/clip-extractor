@@ -16,7 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===============LICENSE_END=========================================================
-# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -
 
 from os import getenv
 import sys
@@ -38,19 +38,24 @@ from event_retrieval import parse_results, event_rle, load_scenes
 import bisect
 
 def do_alignment (metadata_path, align_type, time_tuples, list_of_extractors=None):
-        bounds = parse_results(metadata_path, verbose=True, parser_type=align_type)
-        if list_of_extractors is not None and len(list_of_extractors) > 0:
-            bounds = bounds[bounds['extractor'].isin(list_of_extractors)]
-        starts = sorted(bounds['time_begin'])       # start and stop must be sorted separately b/c of possible overlap
-        stops = sorted(bounds['time_end'])
-        output = []
-        for t_begin, t_end in time_tuples:
-            left = bisect.bisect_left(starts, t_begin) - 1
-            new_begin = starts[left] if left >= 0 else starts[0]
-            right = bisect.bisect_right(stops, t_end)
-            new_end = stops[right] if right < len(stops) else stops[-1]
-            output.append((new_begin, new_end))
-        return output
+    print("metadata_path: " + str(metadata_path))
+    print("align_type: " + str(align_type))
+    print("time_tuples: " + str(time_tuples))
+    print("list_of_extractors: " + str(list_of_extractors))
+    bounds = parse_results(metadata_path, verbose=True, parser_type=align_type)
+    print("type of bounds is" + str(type(bounds)))
+    if list_of_extractors is not None and len(list_of_extractors) > 0:
+        bounds = bounds[bounds['extractor'].isin(list_of_extractors)]
+    starts = sorted(bounds['time_begin'])       # start and stop must be sorted separately b/c of possible overlap
+    stops = sorted(bounds['time_end'])
+    output = []
+    for t_begin, t_end in time_tuples:
+        left = bisect.bisect_left(starts, t_begin) - 1
+        new_begin = starts[left] if left >= 0 else starts[0]
+        right = bisect.bisect_right(stops, t_end)
+        new_end = stops[right] if right < len(stops) else stops[-1]
+        output.append((new_begin, new_end))
+    return output
 
 
 def clip(input_params=None, args=None):
@@ -91,6 +96,10 @@ def clip(input_params=None, args=None):
     submain.add_argument('--alignment_type', type=str, default=None, help='what tag_type should be used for clip alignment')
     submain.add_argument('--alignment_extractors', nargs='+', default=None, help='use shots only from these extractors during alignment')
     submain.add_argument('--clip_bounds', type=float, nargs=2, metavar=('start', 'stop'), help='clip boundaries; negative stop offsets from end', default=None)
+    ## adding for csv output
+    submain = parser.add_argument_group('what is needed for csv output')
+    submain.add_argument('--snack_id', type=int, default=-10, help='what is the snack id')
+    submain.add_argument('--csv_file', type=str, default="", help='FILE to specify where start/stop times of cuts is outputted')
 
     input_vars = contentai.metadata
     if args is not None:
@@ -114,7 +123,9 @@ def clip(input_params=None, args=None):
     else:
         df_scenes = load_scenes(input_vars['path_scenes'])
         if df_scenes is None:
-            df_event = parse_results(input_vars['path_scenes'], verbose=True, parser_type=input_vars['event_type'])
+            dir_scene = Path(input_vars['path_scenes']).parent
+            dir_scene = str(dir_scene)
+            df_event = parse_results(dir_scene, verbose=True, parser_type=input_vars['event_type'])
             df_scenes = event_rle(df_event, score_threshold=input_vars['event_min_score'], 
                                     duration_threshold=input_vars['event_min_length'], 
                                     duration_expand=input_vars['event_expand_length'], peak_method='rle')
@@ -126,8 +137,11 @@ def clip(input_params=None, args=None):
 
     time_tuples = df_scenes[["time_begin", "time_end"]].values.tolist()
     if input_vars['alignment_type'] != None:
-        time_tuples = do_alignment (input_vars['path_scenes'], input_vars['alignment_type'], time_tuples, list_of_extractors=input_vars['alignment_extractors'])
-
+        ## this was fixed so it would work with a clip_bounds input
+        dir_scene = Path(input_vars['path_content']).parent
+        dir_scene = str(dir_scene)
+        time_tuples = do_alignment (dir_scene, input_vars['alignment_type'], time_tuples, list_of_extractors=input_vars['alignment_extractors'])
+    
     logger.info("*p2* (clip specification) peak detection and alignment to various input components (e.g. shots, etc)")
 
     logger.info("*p3* (quality assessment) quality evaluation of frames or video for refined boundaries")
@@ -138,8 +152,17 @@ def clip(input_params=None, args=None):
     logger.info("*p4* (previous input) processing input for regions")
 
     logger.info("*p5* (clip publishing) push of clips to result directory, an S3 bucket, hadoop, azure, etc")
+
     rootname = get_clips (path_content, time_tuples, path_result, profile=input_vars['profile'])
     logger.info(f"Results in: {rootname}")
+
+    logger.info("*p6* (csv export) exporting cut times to csv file")
+    ## adding data frame to csv
+    df = pd.read_csv(input_vars['csv_file'])
+    row_entry = {'snack_id':input_vars['snack_id'], 'alignment_type':input_vars['alignment_type'], 'time_tuples':time_tuples[0]}
+    df = df.append(row_entry, ignore_index=True)
+    df.to_csv(input_vars['csv_file'],index=False)
+
 
 
 if __name__ == "__main__":
