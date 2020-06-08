@@ -51,7 +51,7 @@ def load_scenes(path_scenes):
     return pd.DataFrame(scenes, columns=["time_begin", "time_end"])
 
 
-def parse_results(dir_content, verbose=False, extractor=None, parser_type=None):
+def parse_results(dir_content, verbose=False, extractor_list=None, parser_type=None):
     if type(parser_type) is str:
         parser_type = [parser_type]
     path_content = Path(dir_content)
@@ -62,8 +62,13 @@ def parse_results(dir_content, verbose=False, extractor=None, parser_type=None):
     #       in https://gitlab.research.att.com/turnercode/metadata-flatten-extractor/blob/master/docs/README.rst#getting-started)
     list_parser_modules = parser_get_by_type(parser_type)
 
-    if extractor is not None:   # given a specific name? if so, search with just that one
-        list_parser_modules = [x for x in list_parser_modules if extractor in x["name"]]
+    if extractor_list is not None:   # given a specific name? if so, search with just that one
+        if type(extractor_list) != list:  # normalize to list
+            extractor_list = [extractor_list]
+        list_parser_modules = set()
+        for extractor in extractor_list:  # search across all given instances
+            list_parser_modules |= set([x for x in list_parser_modules if extractor in x["name"]])
+        list_parser_modules = list(list_parser_modules)
     
     df_return = None
     for parser_obj in list_parser_modules:  # iterate through auto-discovered packages
@@ -104,7 +109,7 @@ def rle(inarray):
         return(z, p, ia[i])
 
 
-def event_rle(df, score_threshold=0.8, duration_threshold=10, duration_expand=3, peak_method='rle'):
+def event_rle(df, score_threshold=0.8, duration_threshold=10, duration_expand=3, peak_method='rle', max_duration=-1):
     # original source (has sample for each time interval in video)
     # HBO_20200227_170000_clip_00004  40.2523 9.7069  3600.642700     {"explosion": 0.00016436472414050305}
     # HBO_20200227_170000_clip_00005  49.9592 10.3402 3600.642700     {"explosion": 0.0011733169780347246}
@@ -122,6 +127,8 @@ def event_rle(df, score_threshold=0.8, duration_threshold=10, duration_expand=3,
     # 3       48.300    48.900      48.300         speaker_2  identity       speech  0.75696
     if df is None:
         return None
+
+    # TODO: methodology for max duration analysis
 
     list_col_group = ["tag", "source_event", "tag_type"]
     df_segments = None
@@ -168,21 +175,32 @@ def event_rle(df, score_threshold=0.8, duration_threshold=10, duration_expand=3,
     return df_segments.reset_index(drop=True)
 
 
-def event_alignment (metadata_path, align_type, time_tuples, list_of_extractors=None):
-    bounds = parse_results(metadata_path, verbose=True, parser_type=align_type)
-    assert bounds is not None, f"No entries for alignment type '{align_type}'"
-    if list_of_extractors is not None and len(list_of_extractors) > 0:
-        bounds = bounds[bounds['extractor'].isin(list_of_extractors)]
-    starts = sorted(bounds['time_begin'])       # start and stop must be sorted separately b/c of possible overlap
-    stops = sorted(bounds['time_end'])
-    output = []
-    for t_begin, t_end in time_tuples:
-        left = bisect.bisect_left(starts, t_begin) - 1
-        new_begin = starts[left] if left >= 0 else starts[0]
-        right = bisect.bisect_right(stops, t_end)
-        new_end = stops[right] if right < len(stops) else stops[-1]
-        output.append((new_begin, new_end))
-    return output
+def event_alignment(df_events, df_scenes, max_duration=-1):
+    df_starts = df_events.sort_values('time_begin')       # start and stop must be sorted separately b/c of possible overlap
+    df_ends = df_events.sort_values('time_end')
+    list_return = []
+    for idx, row in df_scenes.iterrows():
+        new_row = row.copy()   # copy to a new working row
+        new_row['event_begin'] = {}
+        new_row['event_end'] = {}
+        # print(new_row)
+
+        left = df_starts["time_begin"].searchsorted(row['time_begin'], side='left')
+        if left >= 0:
+            new_row['time_begin'] = df_starts.iloc[left]['time_begin']
+            new_row['event_begin'] = df_starts.iloc[left].to_dict()   # save the begin event info
+        
+        time_end = row['time_end']
+        if max_duration > 0:   # apply duration limiter
+            time_end = min(time_end, new_row['time_begin'] + max_duration)
+        right = df_ends["time_end"].searchsorted(row['time_end'], side='right')
+        # print("END", row['time_end'], new_row['time_end'], right, len(df_ends))
+        if right < len(df_ends):
+            new_row['time_end'] = df_ends.iloc[right]['time_end']
+            new_row['event_end'] = df_ends.iloc[right].to_dict()   # save the END event info
+
+        list_return.append(new_row)
+    return pd.DataFrame(list_return)
 
 
 if __name__ == "__main__":

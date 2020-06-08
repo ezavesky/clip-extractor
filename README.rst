@@ -22,19 +22,25 @@ executable <#contentai-standalone>`__. Runtime parameters can be passed
 for processing that configure the returned results and can be examined in
 more detail in the `main <main.py>`__ script.
 
--  ``verbose`` - *(bool)* - verbose input/output configuration printing (*default=false*)
--  ``path_content`` - *(str)* - input video path for files to label (*default=video.mp4*)
--  ``path_result`` - *(str)* - output path for samples (*default=.*)
--  ``path_scenes`` - *(str)* - FILE to specify scene begin,end or DIRECTORY with extractor event outputs (*default=``path_content``*)
--  ``profile`` - *(string)* - specify a specific transcoding profile for the output video clips
--  ``overwrite`` - *(flag)* - force overwrite of existing files at result path  (*default=false*)
--  ``event_type`` - *(string)* - specify an event type to look for in generation (*default=tag*)
--  ``event_min_score`` - *(float)* - minimum confidence score for a new event to be considered in a scene (*default=0.8*)
--  ``event_min_length`` - *(float)* - minimum length in seconds for scene selection (*default=10*)
--  ``event_expand_length`` - *(float)* - expand instant events to a minimum of this length in seconds (*default=3*)
--  ``alignment_type`` - *(string)* - what tag_type should be used for clip alignment (*default=None*)
--  ``alignment_extractors`` - *(string list)* - use shots only from these extractors during alignment (*default=None*)
--  ``clip_bounds`` - *(float, float)* - clip boundaries; negative stop offsets from end (*default=None*)
+- Main Input
+    -  ``path_content`` - *(str)* - input video path for files to label (*default=video.mp4*)
+    -  ``path_result`` - *(str)* - output path for samples (*default=.*)
+    -  ``path_scenes`` - *(str)* - FILE to specify scene begin,end or DIRECTORY with extractor event outputs (*default=``path_content``*)
+    -  ``quiet`` - *(bool)* - verbose input/output configuration printing (*default=false*)
+    -  ``csv_file`` - *(str)* - also write output records to this CSV file
+- Encoding Specification
+    -  ``profile`` - *(string)* - specify a specific transcoding profile for the output video clips
+    -  ``overwrite`` - *(flag)* - force overwrite of existing files at result path  (*default=false*)
+- Scene Specification
+    -  ``event_type`` - *(string)* - specify an event type to look for in generation (*default=tag*)
+    -  ``event_min_score`` - *(float)* - minimum confidence score for a new event to be considered in a scene (*default=0.8*)
+    -  ``event_min_length`` - *(float)* - minimum length in seconds for scene selection (*default=10*)
+    -  ``event_expand_length`` - *(float)* - expand instant events to a minimum of this length in seconds (*default=3*)
+    -  ``clip_bounds`` - *(float, float)* - fixed scene timing (instead of events); start/stop (10 36) or negative stop trims from end (10 -10)
+    -  ``max_duration`` - *(float)* - max duration in seconds from scene selction or clip specification (-1 disables) (*default=-1*)
+- Alignment Specification
+    -  ``alignment_type`` - *(string)* - what tag_type should be used for clip alignment (*default=None*)
+    -  ``alignment_extractors`` - *(string list)* - use shots only from these extractors during alignment (*default=None*)
 
 
 Clip Extractor Operations
@@ -45,15 +51,15 @@ Clip Extractor Operations
    * Letterbox detection - will use tools to analyze the first N seconds of video and
      determine if the content is letterboxed.  (profile=letterbox)
 
-2. Transcoding and clipping - All-in-one steps to simultaneously seek to and clip out a region
+2. Scene Detection - Determine the start and end times for a scene, defined with fixed or event-type scores.
+
+3. Alignment and Trimming - Trim the raw scenes by events found from upstream analysis.
+
+4. Transcoding and clipping - All-in-one steps to simultaneously seek to and clip out a region
    of video.  Here, different profiles are available and can be specified via the ``profile`` 
    paremeter above.
    
-   * TBD
-   * TBD 2
-
-
-
+ 
 Execution and Deployment
 ========================
 
@@ -172,6 +178,13 @@ Changes
 
 1.0
 ---
+
+- 1.0.2
+    - refactor to allow trimming/alignment events to be recorded
+    - output results to JSON (and optional CSV)
+    - refactor/reorder some comments to indicate current operation mode
+    - add ability to skip clip generation (profile=none)
+    - add ability to specify a hard limit for clip generation
 
 - 1.0.1
     - fixes for windows and ffmpeg

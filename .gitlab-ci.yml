@@ -175,34 +175,34 @@ cleanup:
     - setup
 
 
-# contentai_push:
-#   stage: publish
-#   # stage: brute
-#   script:
-#     # This script requires a special ContentAI API Key.
-#     # You may need to copy the environment variable
-#     # "CONTENTAI_API_KEY" from Gitlab in Settings -> CI/CD -> Environment Variables
-#     # first, install curl tool (note on alpine (docker image))
-#     - apk add curl
-#     - export CONTENTAI_VERSION=$(curl -s contentai http://get-cli.contentai.io/master)
-#     - curl -so /tmp/contentai http://get-cli.contentai.io/$CONTENTAI_VERSION/ncd_linux_386
-#     - chmod +x /tmp/contentai
-#     # --- as of 1/9/20 logins were interactive, causing issues 
-#     # - /tmp/contentai login $CONTENTAI_API_KEY
-#     - mkdir -p ~/.contentai 
-#     - echo "{ \"apiKey\":\"$CONTENTAI_API_KEY\", \"apiEndpoint\":\"https://prod.api.contentai.io\" }" > ~/.contentai/config
-#     # grab latest docker image
-#     # - scp "$USER_NAME@$DEPLOY_HOST:$DEPLOY_STORAGE/sceneboundary-extractor-1.0.5-f99af636.tar" "$CONTAINER_TEST_FILE" 
-#     - scp "$USER_NAME@$DEPLOY_HOST:$BUILD_STORAGE" "$CONTAINER_TEST_FILE"
-#     # load this docker image to local host, retag
-#     - docker load -i $CONTAINER_TEST_FILE
-#     # deploy via contentai
-#     # - /tmp/contentai deploy sceneboundary --cpu 1024 --memory 2048 -i "vmlr/analytics:sceneboundary-extractor-1.0.5-f99af636"
-#     - /tmp/contentai deploy dsai_$DOCKER_PROJECT -i "$BUILD_IMAGE"
-#   dependencies:
-#     - setup
-#   only:
-#     - master
+contentai_push:
+  stage: publish
+  # stage: brute
+  script:
+    # This script requires a special ContentAI API Key.
+    # You may need to copy the environment variable
+    # "CONTENTAI_API_KEY" from Gitlab in Settings -> CI/CD -> Environment Variables
+    # first, install curl tool (note on alpine (docker image))
+    - apk add curl
+    - export CONTENTAI_VERSION=$(curl -s contentai http://get-cli.contentai.io/master)
+    - curl -so /tmp/contentai http://get-cli.contentai.io/$CONTENTAI_VERSION/ncd_linux_386
+    - chmod +x /tmp/contentai
+    # --- as of 1/9/20 logins were interactive, causing issues 
+    # - /tmp/contentai login $CONTENTAI_API_KEY
+    - mkdir -p ~/.contentai 
+    - echo "{ \"apiKey\":\"$CONTENTAI_API_KEY\", \"apiEndpoint\":\"https://prod.api.contentai.io\" }" > ~/.contentai/config
+    # grab latest docker image
+    # - scp "$USER_NAME@$DEPLOY_HOST:$DEPLOY_STORAGE/sceneboundary-extractor-1.0.5-f99af636.tar" "$CONTAINER_TEST_FILE" 
+    - scp "$USER_NAME@$DEPLOY_HOST:$BUILD_STORAGE" "$CONTAINER_TEST_FILE"
+    # load this docker image to local host, retag
+    - docker load -i $CONTAINER_TEST_FILE
+    # deploy via contentai
+    # - /tmp/contentai deploy sceneboundary --cpu 1024 --memory 2048 -i "vmlr/analytics:sceneboundary-extractor-1.0.5-f99af636"
+    - /tmp/contentai deploy dsai_$DOCKER_PROJECT -i "$BUILD_IMAGE"
+  dependencies:
+    - setup
+  only:
+    - master
 
 
 
