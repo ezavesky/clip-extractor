@@ -31,16 +31,18 @@ more detail in the `main <main.py>`__ script.
 - Encoding Specification
     -  ``profile`` - *(string)* - specify a specific transcoding profile for the output video clips
     -  ``overwrite`` - *(flag)* - force overwrite of existing files at result path  (*default=false*)
+- General Boundaries
 - Scene Specification
     -  ``event_type`` - *(string)* - specify an event type to look for in generation (*default=tag*)
-    -  ``event_min_score`` - *(float)* - minimum confidence score for a new event to be considered in a scene (*default=0.8*)
     -  ``event_min_length`` - *(float)* - minimum length in seconds for scene selection (*default=10*)
-    -  ``event_expand_length`` - *(float)* - expand instant events to a minimum of this length in seconds (*default=3*)
+    -  ``event_expand_length`` - *(float)* - expand instant events to a minimum of this length in seconds (*default=5*)
     -  ``clip_bounds`` - *(float, float)* - fixed scene timing (instead of events); start/stop (10 36) or negative stop trims from end (10 -10)
     -  ``max_duration`` - *(float)* - max duration in seconds from scene selction or clip specification (-1 disables) (*default=-1*)
 - Alignment Specification
     -  ``alignment_type`` - *(string)* - what tag_type should be used for clip alignment (*default=None*)
+    -  ``alignment_type_fallback`` - *(string)* - what tag_type should be used for clip alignment (as a fallback) (*default=None*) (added v1.0.3)
     -  ``alignment_extractors`` - *(string list)* - use shots only from these extractors during alignment (*default=None*)
+    -  ``event_min_score`` - *(float)* - min confidence for new event to be use in trim (*default=0.6*)
 
 
 Clip Extractor Operations
@@ -105,9 +107,24 @@ configuration.
 
 .. code:: shell
 
-   ./run_local.sh 0 --path_content path/video.mp4 --path_result results/ --profile letterbox --clip_bounds 5 -5
-   ./run_local.sh 1 path/video.mp4 results/ '{"profile":"letterbox"}'
-   ./run_local.sh DOCKERIMAGE path/video.mp4 results/ '{"profile":"letterbox"}'
+    # using a video, bootstrap a scene bonudary from 15s from the start and 15s from the end, apply a
+    #   maximum duration of 90s and trim with transcrips
+    ./run_local.sh  0 --path_content results-witch/HBO_20200222_114000_000803_00108_season_of_the_witch.mp4/video.mp4 \
+        --path_result results-witch/test --clip_bounds 15 -15 --max_duration 90 --alignment_type transcript  --profile popcorn
+
+    # using a video, bootstrap a scene bonudary from 5s from the start and 5s from the end, trim with 
+    #   detected identity tags and do not encode a resultant video or frame (no profile provided)
+    ./run_local.sh  0 --path_content results-witch/HBO_20200222_114000_000803_00108_season_of_the_witch.mp4/video.mp4 \
+        --path_result results-witch/test --clip_bounds 5 -5 --alignment_type identity
+
+    # extract a letter-box trimmed example from the default scene defintions (with no trimming)
+    ./run_local.sh 0 --path_content path/video.mp4 --path_result results/ --profile letterbox 
+
+    # perform the same task but emulating the local ContentAI interface
+    ./run_local.sh 1 path/video.mp4 results/ '{"profile":"letterbox"}'
+
+    # perform the same task but use the full docker-based ContentAI interface
+    ./run_local.sh DOCKERIMAGE path/video.mp4 results/ '{"profile":"letterbox"}'
 
 
 
@@ -178,6 +195,10 @@ Changes
 
 1.0
 ---
+
+- 1.0.3
+    - fallback event type added, more verbosity when that fallback is chosen
+    - don't skip/abort trimming if there is no start marker found
 
 - 1.0.2
     - refactor to allow trimming/alignment events to be recorded

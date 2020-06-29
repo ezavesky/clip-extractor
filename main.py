@@ -72,16 +72,18 @@ def clip(input_params=None, args=None):
 
     submain = parser.add_argument_group('scene detection specifications')
     submain.add_argument('--event_type', type=str, default='face', help='what tag_type should be used to identify clips')
-    submain.add_argument('--event_min_score', type=float, default=0.8, help='minimum score for encoding')
-    submain.add_argument('--event_expand_length', type=float, default=3, help='expand instant events to a minimum of this length')
-    submain.add_argument('--event_min_length', type=float, default=10, help='minimum length in seconds for event scene selection')
+    submain.add_argument('--event_expand_length', type=float, default=5, help='expand instant events to a minimum of this length (default %(default)s)')
+    submain.add_argument('--event_min_length', type=float, default=10, help='minimum length in seconds for event scene selection (default %(default)s)')
+    submain.add_argument('--event_min_score', type=float, default=0.8, help='min confidence for new event to be considered in a scene (default %(default)s)')
     submain.add_argument('--clip_bounds', type=float, nargs=2, metavar=('start', 'stop'), help='fixed scene timing (instead of events); start/stop (10 36) or negative stop trims from end (10 -10)', default=None)
     submain.add_argument('--max_duration', type=float, default=-1, help='max duration in seconds from scene selction or clip specification (-1 disables)')
 
     submain = parser.add_argument_group('final alignment specifications')
-    submain.add_argument('--alignment_type', type=str, default=None, help='what tag_type should be used for clip alignment')
+    submain.add_argument('--alignment_type', type=str, default=None, help='what tag_type should be used for clip alignment (default %(default)s)')
     submain.add_argument('--alignment_extractors', nargs='+', default=None, help='use shots only from these extractors during alignment')
-
+    submain.add_argument('--alignment_type_fallback', type=str, default='shot', help='what tag_type should be used for clip alignment (as a fallback, default %(default)s)')
+    submain.add_argument('--alignment_min_score', type=float, default=0.6, help='min confidence for new event to be use in trim (default %(default)s)')
+    
     input_vars = contentai.metadata
     if args is not None:
         input_vars.update(vars(parser.parse_args(args)))
@@ -96,7 +98,7 @@ def clip(input_params=None, args=None):
 
     path_video = Path(input_vars['path_content'])   # path to a video file
     path_result = Path(input_vars['path_result'])   # destination dir
-    path_scenes = Path(input_vars['path_scenes'])   # alternate scenes data (could be file or dir)
+    path_scenes = Path(input_vars['path_scenes']) if len(input_vars['path_scenes']) else path_video   # alternate scenes data (could be file or dir)
 
     def meta_path ():       # metadata path is only calculated when needed
         if path_scenes.is_dir():
@@ -126,8 +128,7 @@ def clip(input_params=None, args=None):
                                      parser_type=input_vars['event_type'])
             df_scenes = event_rle(df_event, score_threshold=input_vars['event_min_score'], 
                                     duration_threshold=input_vars['event_min_length'], 
-                                    duration_expand=input_vars['event_expand_length'], peak_method='rle',
-                                    max_duration=input_vars['max_duration'])
+                                    duration_expand=input_vars['event_expand_length'], peak_method='rle')
     if df_scenes is None:
         logger.error(f"Error: No scene sources were provided ('{input_vars['path_scenes']}') or found with events, aborting.")
         return
@@ -147,18 +148,29 @@ def clip(input_params=None, args=None):
                                  parser_type=input_vars['alignment_type'], 
                                  extractor_list=input_vars['alignment_extractors'])
         if df_event is None or len(df_event) == 0:
-            logger.warning(f"Warning: Requested specific alignment type '{input_vars['alignment_type']}' but no events found, skipipng trim.")
-        else:
-            df_scenes = event_alignment(df_event, df_scenes, input_vars['max_duration'])
-    if not input_vars['quiet']:
-        logger.info(f"Trimmed to {len(df_scenes)} scenes with average length {(df_scenes['time_end']-df_scenes['time_begin']).mean()}s from source file...")
+            logger.warning(f"Warning: Requested specific alignment type '{input_vars['alignment_type']}' but no events found, trimming may have no effect.")
+        df_events_fallback = None
+        if len(input_vars['alignment_type_fallback']):   # had a fallback type of event?
+            df_events_fallback = parse_results(meta_path(), verbose=not input_vars['quiet'], 
+                                    parser_type=input_vars['alignment_type_fallback'])
+            logger.info(f"(alignment boundaries include {len(df_events_fallback)} fallback events of type '{input_vars['alignment_type_fallback']}')")
+        df_scenes = event_alignment(df_event, df_scenes, input_vars['max_duration'], 
+                                    df_events_fallback=df_events_fallback, score_threshold=input_vars['alignment_min_score'])
+        if not input_vars['quiet']:
+            for idx, row in df_scenes.iterrows():
+                logger.info(f"[Scene {idx}]: START {row['time_begin']} ({row['event_begin']}) - END {row['time_end']} ({row['event_end']})")
 
-    if not input_vars['quiet']:
-        logger.info("*p4* (previous input) processing input for regions")
-    time_tuples = df_scenes[["time_begin", "time_end"]].values.tolist()
-    list_clips = get_clips(str(path_video), time_tuples, path_result, 
-                            profile=input_vars['profile'], overwrite=input_vars['overwrite'])
-    df_scenes["path"] = ""
+    list_clips = []
+    if len(df_scenes):
+        if not input_vars['quiet']:
+            logger.info(f"Trimmed to {len(df_scenes)} scenes with average length {(df_scenes['time_end']-df_scenes['time_begin']).mean()}s from source file...")
+
+        if not input_vars['quiet']:
+            logger.info("*p4* (previous input) processing input for regions")
+        time_tuples = df_scenes[["time_begin", "time_end"]].values.tolist()
+        list_clips = get_clips(str(path_video), time_tuples, path_result, 
+                                profile=input_vars['profile'], overwrite=input_vars['overwrite'])
+        df_scenes["path"] = ""
     if len(list_clips):
         logger.info(f"Clipped video files stored as: '{list_clips}'... ")
         df_scenes["path"] = list_clips
@@ -170,6 +182,7 @@ def clip(input_params=None, args=None):
     version_dict = _version.version()
     dict_result = {'config': {'version':version_dict['version'], 'extractor':version_dict['package'],
                             'input':str(path_video.resolve()), 'timestamp': str(datetime.now()) }, 'results':[] }
+    logger.info(f"Trimmed to {len(list_clips)} scenes...")
 
     # write out data if completed
     if len(input_vars['path_result']) > 0:

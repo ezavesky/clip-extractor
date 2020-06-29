@@ -32,6 +32,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
 from metadata_flatten.parsers import get_by_type as parser_get_by_type  # parse other extractor inputs
+from metadata_flatten.parsers import empty_dataframe
 
 
 def load_scenes(path_scenes):
@@ -56,7 +57,7 @@ def parse_results(dir_content, verbose=False, extractor_list=None, parser_type=N
         parser_type = [parser_type]
     path_content = Path(dir_content)
     if not path_content.exists() or not path_content.is_dir:
-        return None
+        return empty_dataframe()
 
     # TODO: open this up for other input types (see other entries under 'tag_type' 
     #       in https://gitlab.research.att.com/turnercode/metadata-flatten-extractor/blob/master/docs/README.rst#getting-started)
@@ -70,7 +71,7 @@ def parse_results(dir_content, verbose=False, extractor_list=None, parser_type=N
             list_parser_modules |= set([x for x in list_parser_modules if extractor in x["name"]])
         list_parser_modules = list(list_parser_modules)
     
-    df_return = None
+    df_return = empty_dataframe()
     for parser_obj in list_parser_modules:  # iterate through auto-discovered packages
         parser_instance = parser_obj['obj'](dir_content)   # create instance
         df = parser_instance.parse({"verbose": verbose})  # attempt to process
@@ -84,7 +85,7 @@ def parse_results(dir_content, verbose=False, extractor_list=None, parser_type=N
                 df_return = df
             else:
                 df_return = df_return.append(df, ignore_index=False, sort=False)
-    if df_return is None:
+    if not len(df_return):
         logger.critical(f"Could not find shots from extractors {[x['name'] for x in list_parser_modules]}, aborting.")
     return df_return
 
@@ -175,9 +176,19 @@ def event_rle(df, score_threshold=0.8, duration_threshold=10, duration_expand=3,
     return df_segments.reset_index(drop=True)
 
 
-def event_alignment(df_events, df_scenes, max_duration=-1):
-    df_starts = df_events.sort_values('time_begin')       # start and stop must be sorted separately b/c of possible overlap
-    df_ends = df_events.sort_values('time_end')
+def event_alignment(df_events, df_scenes, max_duration=-1, df_events_fallback=None, score_threshold=0.5):
+    df_events_sub = df_events[df_events['score'] >= score_threshold]
+    df_starts = df_events_sub.sort_values('time_begin')       # start and stop must be sorted separately b/c of possible overlap
+    df_ends = df_events_sub.sort_values('time_end')
+
+
+    df_starts_fallback = None
+    df_ends_fallback = None
+    if df_events_fallback is not None:
+        df_events_sub = df_events_fallback[df_events_fallback['score'] >= score_threshold]
+        df_starts_fallback = df_events_sub.sort_values('time_begin')
+        df_ends_fallback = df_events_sub.sort_values('time_end')
+
     list_return = []
     for idx, row in df_scenes.iterrows():
         new_row = row.copy()   # copy to a new working row
@@ -185,11 +196,21 @@ def event_alignment(df_events, df_scenes, max_duration=-1):
         new_row['event_end'] = {}
         # print(new_row)
 
+        # TODO: if scene is more than duration, consider contracting instead
+
         left = df_starts["time_begin"].searchsorted(row['time_begin'], side='left')
-        if left >= 0:
+        if left >= 0 and left < len(df_starts):
+            # print(left, len(df_starts), row['time_begin'])
+            # print(df_starts["time_begin"])
             new_row['time_begin'] = df_starts.iloc[left]['time_begin']
             new_row['event_begin'] = df_starts.iloc[left].to_dict()   # save the begin event info
-        
+        elif df_starts_fallback is not None:   # utilize fallback if there (e.g. shots)
+            left = df_starts_fallback["time_begin"].searchsorted(row['time_begin'], side='left')
+            if left >= 0 and left < len(df_starts_fallback):
+                new_row['time_begin'] = df_starts_fallback.iloc[left]['time_begin']
+                new_row['event_begin'] = df_starts_fallback.iloc[left].to_dict()   # save the begin event info
+                # print(f"FALLBACK LEFT - {left}, from: {row['time_begin']} to {new_row['time_begin'] }")
+
         time_end = row['time_end']
         if max_duration > 0:   # apply duration limiter
             time_end = min(time_end, new_row['time_begin'] + max_duration)
@@ -198,6 +219,14 @@ def event_alignment(df_events, df_scenes, max_duration=-1):
         if right < len(df_ends):
             new_row['time_end'] = df_ends.iloc[right]['time_end']
             new_row['event_end'] = df_ends.iloc[right].to_dict()   # save the END event info
+        elif df_ends_fallback is not None:    # utilize fallback if there (e.g. shots)
+            right = df_ends_fallback["time_end"].searchsorted(row['time_end'], side='right')
+            if right < len(df_ends_fallback):
+                new_row['time_end'] = df_ends_fallback.iloc[right]['time_end']
+                new_row['event_end'] = df_ends_fallback.iloc[right].to_dict()   # save the END event info
+                # print(f"FALLBACK RIGHT - {right}, from: {row['time_end']} to {new_row['time_end'] }")
+
+        # TODO: instead of hard cut for end, trim from both sides, assuming event in middle?
 
         list_return.append(new_row)
     return pd.DataFrame(list_return)
