@@ -9,6 +9,7 @@ if [ $# -lt 1 ]; then
     echo "                 = 1 IF local, otherwise a docker image to run "
     echo "                 = IMAGE_NAME IF docker image name to run"
     echo " "
+    echo "  (Please see README.rst or program help (-h arugment) for more specific execution examples...)"
     echo "  ./run_local.sh 0 --path_content features/video.mp4 --path_result results/  "
     echo "  ./run_local.sh 1 features/video.mp4 results/ '{\"verbose\":true}' "
     echo "  ./run_local.sh IMAGEID features/video.mp4 results/ '{\"verbose\":true}' "

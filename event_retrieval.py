@@ -18,15 +18,17 @@
 # ===============LICENSE_END=========================================================
 # -*- coding: utf-8 -*-
 
-import pandas as pd
-import numpy as np
+import math
 from pathlib import Path
 import glob  # for model listing
 from datetime import datetime
 import json
 import bisect
-
 import logging
+
+import pandas as pd
+import numpy as np
+
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -35,7 +37,7 @@ from metadata_flatten.parsers import get_by_type as parser_get_by_type  # parse 
 from metadata_flatten.parsers import empty_dataframe
 
 
-def load_scenes(path_scenes):
+def load_scenes(path_scenes, dir_content=None, parser_type=None, verbose=False):
     path_scenes = Path(path_scenes).resolve()   # file containing list of scenes e.g. 0,100\n 100,200\n etc
     def pair(line):
         items = line.split(",")
@@ -44,11 +46,20 @@ def load_scenes(path_scenes):
             assert len(items) == 2, "Expected a pair of numbers"
         return float(items[0]), float(items[1])
 
+    scenes = []
     if not path_scenes.exists() or path_scenes.is_dir():
         return None
 
-    # Read the list of scenes -- one start,stop pair per line
-    scenes = [pair(x.strip()) for x in open(path_scenes).readlines() if len(x) > 1]
+    # if not path_scenes.exists():
+    #     return None
+    # if path_scenes.is_dir():
+    #     df_events = parse_results(path_scenes, verbose=verbose, parser_type=parser_type)
+    #     time_max = df_events["time_end"].max()
+    #     time_min = df_events["time_begin"].min()
+    #     scenes = [[time_min, time_max]]
+    else:   # Read the list of scenes -- one start,stop pair per line
+        scenes = [pair(x.strip()) for x in open(path_scenes).readlines() if len(x) > 1]
+
     return pd.DataFrame(scenes, columns=["time_begin", "time_end"])
 
 
@@ -129,7 +140,8 @@ def event_rle(df, score_threshold=0.8, duration_threshold=10, duration_expand=3,
     if df is None:
         return None
 
-    # TODO: methodology for max duration analysis
+    # we will be RESAMPLING/EXPANDING the windows, so adjust our duration expecations to a count
+    duration_threshold_count = math.floor(duration_threshold / duration_expand)
 
     list_col_group = ["tag", "source_event", "tag_type"]
     df_segments = None
@@ -150,11 +162,10 @@ def event_rle(df, score_threshold=0.8, duration_threshold=10, duration_expand=3,
             logger.error(f"Error: Unknown peak-detection method {peak_method}, aborting.")
             return None
         n  = len(runlengths)
-        # print(mask, runlengths)
 
         output = []
         for i in range(n):
-            if runlengths[i] >= duration_threshold and score_valid[i] == True:
+            if runlengths[i] >= duration_threshold_count and score_valid[i] == True:
                 start_off = start_pos[i]
                 start_time = df_score_sample.iloc[start_off]["time_begin"]
                 if i + 1 >= n:
@@ -176,11 +187,10 @@ def event_rle(df, score_threshold=0.8, duration_threshold=10, duration_expand=3,
     return df_segments.reset_index(drop=True)
 
 
-def event_alignment(df_events, df_scenes, max_duration=-1, df_events_fallback=None, score_threshold=0.5):
+def event_alignment(df_events, df_scenes, max_duration=-1, min_duration=-1, df_events_fallback=None, score_threshold=0.5):
     df_events_sub = df_events[df_events['score'] >= score_threshold]
     df_starts = df_events_sub.sort_values('time_begin')       # start and stop must be sorted separately b/c of possible overlap
     df_ends = df_events_sub.sort_values('time_end')
-
 
     df_starts_fallback = None
     df_ends_fallback = None
