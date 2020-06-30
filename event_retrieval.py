@@ -187,6 +187,53 @@ def event_rle(df, score_threshold=0.8, duration_threshold=10, duration_expand=3,
     return df_segments.reset_index(drop=True)
 
 
+def event_search(row, df, max_duration, direction_earlier, df_fallback=None, allow_flip=True):
+    time_return = 0 
+    if not direction_earlier:  # if going later, cap by max offset/duration
+        time_return = row['time_end']
+        if max_duration > 0:
+            time_return = min(time_return, row['time_begin'] + max_duration)
+    event_return = None
+
+    side_search = 'left' if direction_earlier else 'right'
+    field_search = 'time_begin' if direction_earlier else 'time_end'
+
+    idx = df[field_search].searchsorted(row[field_search], side=side_search)
+    if not direction_earlier:
+        idx -= 1
+
+    if idx >= 0 and idx < len(df):
+        # print(left, len(df_starts), row['time_begin'])
+        # print(df_starts["time_begin"])
+        time_return = df.iloc[idx][field_search]
+        event_return = df.iloc[idx].to_dict()   # save the begin event info
+    else:
+        # special logic to see if it's closer to search "inward"
+        new_row = row.copy()   # copy to a new working row
+        if allow_flip:
+            time_center = (new_row['time_end'] + new_row['time_begin']) / 2
+            if direction_earlier:
+                new_row['time_end'] = new_row['time_begin']
+            else:
+               new_row['time_begin'] = new_row['time_end']
+            time_return, event_return = event_search(new_row, df, max_duration, not direction_earlier, df_fallback, False)
+        
+        if df_fallback is not None:   # utilize fallback if there (e.g. shots)
+            idx = df_fallback[field_search].searchsorted(row[field_search], side=side_search)
+            if not direction_earlier:
+                idx -= 1
+            if idx >= 0 and idx < len(df_fallback):
+                time_fallback = df_fallback.iloc[idx][field_search]
+                if not allow_flip or abs(time_center - time_fallback) < abs(time_center - time_return):  # new fallback was better
+                    time_return = df_fallback.iloc[idx][field_search]
+                    event_return = df_fallback.iloc[idx].to_dict()   # save the begin event info
+                    # print(f"FALLBACK LEFT - {left}, from: {row['time_begin']} to {time_return }")
+
+    return time_return, event_return
+
+
+
+
 def event_alignment(df_events, df_scenes, max_duration=-1, min_duration=-1, df_events_fallback=None, score_threshold=0.5):
     df_events_sub = df_events[df_events['score'] >= score_threshold]
     df_starts = df_events_sub.sort_values('time_begin')       # start and stop must be sorted separately b/c of possible overlap
@@ -204,37 +251,11 @@ def event_alignment(df_events, df_scenes, max_duration=-1, min_duration=-1, df_e
         new_row = row.copy()   # copy to a new working row
         new_row['event_begin'] = {}
         new_row['event_end'] = {}
-        # print(new_row)
 
-        # TODO: if scene is more than duration, consider contracting instead
-
-        left = df_starts["time_begin"].searchsorted(row['time_begin'], side='left')
-        if left >= 0 and left < len(df_starts):
-            # print(left, len(df_starts), row['time_begin'])
-            # print(df_starts["time_begin"])
-            new_row['time_begin'] = df_starts.iloc[left]['time_begin']
-            new_row['event_begin'] = df_starts.iloc[left].to_dict()   # save the begin event info
-        elif df_starts_fallback is not None:   # utilize fallback if there (e.g. shots)
-            left = df_starts_fallback["time_begin"].searchsorted(row['time_begin'], side='left')
-            if left >= 0 and left < len(df_starts_fallback):
-                new_row['time_begin'] = df_starts_fallback.iloc[left]['time_begin']
-                new_row['event_begin'] = df_starts_fallback.iloc[left].to_dict()   # save the begin event info
-                # print(f"FALLBACK LEFT - {left}, from: {row['time_begin']} to {new_row['time_begin'] }")
-
-        time_end = row['time_end']
-        if max_duration > 0:   # apply duration limiter
-            time_end = min(time_end, new_row['time_begin'] + max_duration)
-        right = df_ends["time_end"].searchsorted(row['time_end'], side='right')
-        # print("END", row['time_end'], new_row['time_end'], right, len(df_ends))
-        if right < len(df_ends):
-            new_row['time_end'] = df_ends.iloc[right]['time_end']
-            new_row['event_end'] = df_ends.iloc[right].to_dict()   # save the END event info
-        elif df_ends_fallback is not None:    # utilize fallback if there (e.g. shots)
-            right = df_ends_fallback["time_end"].searchsorted(row['time_end'], side='right')
-            if right < len(df_ends_fallback):
-                new_row['time_end'] = df_ends_fallback.iloc[right]['time_end']
-                new_row['event_end'] = df_ends_fallback.iloc[right].to_dict()   # save the END event info
-                # print(f"FALLBACK RIGHT - {right}, from: {row['time_end']} to {new_row['time_end'] }")
+        new_row['time_begin'], new_row['event_begin'] = \
+            event_search(row, df_starts, max_duration, True, df_starts_fallback)
+        new_row['time_end'], new_row['event_end'] = \
+            event_search(row, df_ends, max_duration, False, df_ends_fallback)
 
         # TODO: instead of hard cut for end, trim from both sides, assuming event in middle?
 

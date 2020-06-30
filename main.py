@@ -178,11 +178,16 @@ def clip(input_params=None, args=None):
                                     parser_type=input_vars['finalize_type'])
             if not input_vars['quiet']:
                 logger.info(f"(alignment boundaries include {len(df_events_fallback)} fallback events of type '{input_vars['finalize_type']}')")
+
+        if not input_vars['quiet']:
+            for idx, row in df_scenes.iterrows():
+                logger.info(f"[PRE-Scene {idx}]: START {row['time_begin']} - END {row['time_end']} ")
+
         df_scenes = event_alignment(df_event, df_scenes, input_vars['duration_max'], input_vars['duration_min'], 
                                     df_events_fallback=df_events_fallback, score_threshold=input_vars['alignment_min_score'])
         if not input_vars['quiet']:
             for idx, row in df_scenes.iterrows():
-                logger.info(f"[Scene {idx}]: START {row['time_begin']} ({row['event_begin']}) - END {row['time_end']} ({row['event_end']})")
+                logger.info(f"[POST-Scene {idx}]: START {row['time_begin']} ({row['event_begin']}) - END {row['time_end']} ({row['event_end']})")
 
     list_clips = []
     if len(df_scenes):
