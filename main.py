@@ -49,10 +49,25 @@ def clip(input_params=None, args=None):
     parser = argparse.ArgumentParser(
         description="""A script to launch a clip extraction and transcode process...""",
         epilog="""
+        (*) Certain tag types expand to special multi-tag classes....
+            tag:face -> search among tag_type 'tag' but tag name must contain 'face'
+            identity:speaker_ -> search among tag_type 'identity' but tag name must contain 'speaker_'
+            identity:^speaker_ -> search among tag_type 'identity' but tag name must *NOT* contain 'speaker_'
+
         Example execution patterns...
             # detect scenes from transcript output (max of 90s), then apply standard trimming 
             python main.py --path_content results-witch/video.mp4 \
                 --path_result results-witch/test --duration_max 90 --alignment_type transcript --profile popcorn 
+
+            # using an existing video, bootstrap a scene boundary from 15s from the start and 15s from the end
+            #   align using tags of type 'tag' containing the word 'face'
+            python main.py --path_content results-witch/video.mp4 --profile popcorn \
+                --path_result results-witch/test --clip_bounds 15 -15 --duration_max 90 --alignment_type "tag:face" 
+
+            # using an existing video, bootstrap a scene boundary from 15s from the start and 15s from the end
+            #   align using tags of type 'identity' NOT containing the word 'speaker_'
+            python main.py --path_content results-witch/video.mp4 --profile popcorn \
+                --path_result results-witch/test --clip_bounds 15 -15 --duration_max 90 --alignment_type "identity:^speaker_" 
 
             # using an existing video, bootstrap a scene boundary from 15s from the start and 15s from the end, apply a
             #   maximum duration of 90s and trim with transcrips, generate video on completion
@@ -85,18 +100,18 @@ def clip(input_params=None, args=None):
 
     submain = parser.add_argument_group('overall boundary modifications')
     # submain.add_argument('--time_smudge', type=float, default=0.5, help='time in seconds to rewind/ffwd final scene boundaries (0=off, default %(default)s)')
-    submain.add_argument('--finalize_type', type=str, default='shot', help='what tag_type should be used for clip alignment (as a finalize timing, default %(default)s)')
+    submain.add_argument('--finalize_type', type=str, default='shot', help='what tag_type* should be used for clip alignment (as a finalize timing, default %(default)s)')
     submain.add_argument('--duration_max', type=float, default=-1, help='max duration in seconds from scene selction or clip specification (-1 disables)')
     submain.add_argument('--duration_min', type=float, default=10, help='minimum length in seconds for event scene selection (default %(default)s)')
 
     submain = parser.add_argument_group('scene detection specifications')
-    submain.add_argument('--event_type', type=str, default='transcript', help='what tag_type should be used to identify clips')
+    submain.add_argument('--event_type', type=str, default='transcript', help='what tag_type* should be used to identify clips')
     submain.add_argument('--event_expand_length', type=float, default=5, help='expand instant events to a minimum of this length (default %(default)s)')
     submain.add_argument('--event_min_score', type=float, default=0.8, help='min confidence for new event to be considered in a scene (default %(default)s)')
     submain.add_argument('--clip_bounds', type=float, nargs=2, metavar=('start', 'stop'), help='fixed scene timing (instead of events); start/stop (10 36) or negative stop trims from end (10 -10)', default=None)
 
     submain = parser.add_argument_group('final alignment specifications')
-    submain.add_argument('--alignment_type', type=str, default=None, help='what tag_type should be used for clip alignment (default %(default)s)')
+    submain.add_argument('--alignment_type', type=str, default=None, help='what tag_type* should be used for clip alignment (default %(default)s)')
     submain.add_argument('--alignment_extractors', nargs='+', default=None, help='use shots only from these extractors during alignment')
     submain.add_argument('--alignment_min_score', type=float, default=0.6, help='min confidence for new event to be use in trim (default %(default)s)')
     
@@ -141,8 +156,7 @@ def clip(input_params=None, args=None):
     else:
         df_scenes = load_scenes(str(path_scenes))
         if df_scenes is None:
-            df_event = parse_results(meta_path(), verbose=not input_vars['quiet'], 
-                                     parser_type=input_vars['event_type'])
+            df_event = parse_results(meta_path(), input_vars['event_type'], verbose=not input_vars['quiet'])
             df_scenes = event_rle(df_event, score_threshold=input_vars['event_min_score'], 
                                     duration_threshold=input_vars['duration_min'], 
                                     duration_expand=input_vars['event_expand_length'], peak_method='rle')
@@ -167,15 +181,14 @@ def clip(input_params=None, args=None):
             input_vars['alignment_type'] = input_vars['finalize_type']
 
     if input_vars['alignment_type'] != None:  # if we had an alignment type
-        df_event = parse_results(meta_path(), verbose=not input_vars['quiet'], 
-                                 parser_type=input_vars['alignment_type'], 
+        df_event = parse_results(meta_path(), input_vars['alignment_type'], 
+                                 verbose=not input_vars['quiet'], 
                                  extractor_list=input_vars['alignment_extractors'])
         if df_event is None or len(df_event) == 0:
             logger.warning(f"Warning: Requested specific alignment type '{input_vars['alignment_type']}' but no events found, trimming may have no effect.")
         df_events_fallback = None
         if len(input_vars['finalize_type']) and input_vars['finalize_type'] != input_vars['alignment_type']:   # had additional fallback type
-            df_events_fallback = parse_results(meta_path(), verbose=not input_vars['quiet'], 
-                                    parser_type=input_vars['finalize_type'])
+            df_events_fallback = parse_results(meta_path(), input_vars['finalize_type'], verbose=not input_vars['quiet'])
             if not input_vars['quiet']:
                 logger.info(f"(alignment boundaries include {len(df_events_fallback)} fallback events of type '{input_vars['finalize_type']}')")
 

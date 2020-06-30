@@ -63,12 +63,25 @@ def load_scenes(path_scenes, dir_content=None, parser_type=None, verbose=False):
     return pd.DataFrame(scenes, columns=["time_begin", "time_end"])
 
 
-def parse_results(dir_content, verbose=False, extractor_list=None, parser_type=None):
+def parse_results(dir_content, parser_type, verbose=False, extractor_list=None):
     if type(parser_type) is str:
         parser_type = [parser_type]
     path_content = Path(dir_content)
     if not path_content.exists() or not path_content.is_dir:
         return empty_dataframe()
+    parser_sub_incl = ""
+    parser_sub_excl = ""
+    parser_new = []
+    for type_str in parser_type:
+        type_str = type_str.split(":")
+        parser_new.append(type_str[0])
+        if len(type_str) > 1:
+            if type_str[1][0] != '^':
+                parser_sub_incl = type_str[1]
+            else:
+                parser_sub_excl = type_str[1][1:]
+    parser_type = parser_new
+    print(parser_sub_excl, parser_sub_incl)
 
     # TODO: open this up for other input types (see other entries under 'tag_type' 
     #       in https://gitlab.research.att.com/turnercode/metadata-flatten-extractor/blob/master/docs/README.rst#getting-started)
@@ -88,6 +101,11 @@ def parse_results(dir_content, verbose=False, extractor_list=None, parser_type=N
         df = parser_instance.parse({"verbose": verbose})  # attempt to process
         if df is not None:
             df = df[df["tag_type"].isin(parser_type)]   # subselect only shots
+            if len(parser_sub_incl):    # subselect type within a tag
+                df = df[df["tag"].str.contains(parser_sub_incl)]
+            if len(parser_sub_excl):    # exclude type within a tag
+                df = df[~df["tag"].str.contains(parser_sub_excl)]
+            print(df)
         if df is not None and len(df):
             if verbose:
                 logger.critical(f"Found  {len(df)} shots with total duration {df['time_end'].max()}...")
@@ -228,10 +246,8 @@ def event_search(row, df, max_duration, direction_earlier, df_fallback=None, all
                     time_return = df_fallback.iloc[idx][field_search]
                     event_return = df_fallback.iloc[idx].to_dict()   # save the begin event info
                     # print(f"FALLBACK LEFT - {left}, from: {row['time_begin']} to {time_return }")
-
+        # end of miss from first pass
     return time_return, event_return
-
-
 
 
 def event_alignment(df_events, df_scenes, max_duration=-1, min_duration=-1, df_events_fallback=None, score_threshold=0.5):

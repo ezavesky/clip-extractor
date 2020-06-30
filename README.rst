@@ -107,34 +107,35 @@ configuration.
 
 .. code:: shell
 
-    # detect scenes from transcript output (max of 90s), then apply standard trimming 
-    ./run_local.sh  0 --path_content results-witch/video.mp4 \
-        --path_result results-witch/test --duration_max 90 --alignment_type transcript --profile popcorn 
+    (*) Certain tag types expand to special multi-tag classes...
+        tag:face -> search among tag_type 'tag' but tag name must contain 'face'
+        identity:speaker\_ -> search among tag_type 'identity' but tag name must contain 'speaker\_'
+        identity:^speaker\_ -> search among tag_type 'identity' but tag name must *NOT* contain 'speaker\_'
 
-    # using an existing video, bootstrap a scene boundary from 15s from the start and 15s from the end, apply a
-    #   maximum duration of 90s and trim with transcrips, generate video on completion
-    ./run_local.sh  0 --path_content results-witch/video.mp4 --profile popcorn \
-        --path_result results-witch/test --clip_bounds 15 -15 --duration_max 90 --alignment_type transcript 
+    Example execution patterns...
+        # detect scenes from transcript output (max of 90s), then apply standard trimming 
+        python main.py --path_content results-witch/video.mp4 \
+            --path_result results-witch/test --duration_max 90 --alignment_type transcript --profile popcorn 
 
-    # using an existing video, bootstrap a scene boundary from 15s from the start and 15s from the end, apply a
-    #   maximum duration of 90s and trim with transcrips
-    ./run_local.sh  0 --path_content results-witch/video.mp4 --finalize_type tag \
-        --path_result results-witch/test --clip_bounds 15 -15 --duration_max 90 --alignment_type transcript 
+        # using an existing video, bootstrap a scene boundary from 15s from the start and 15s from the end
+        #   align using tags of type 'tag' containing the word 'face'
+        python main.py --path_content results-witch/video.mp4 --profile popcorn \
+            --path_result results-witch/test --clip_bounds 15 -15 --duration_max 90 --alignment_type "tag:face" 
 
-    # using an existing video, bootstrap a scene bonudary from 5s from the start and 5s from the end, trim with 
-    #   detected identity tags and do not encode a resultant video or frame (no profile provided)
-    ./run_local.sh  0 --path_content results-witch/HBO_20200222_114000_000803_00108_season_of_the_witch.mp4/video.mp4 \
-        --path_result results-witch/test --clip_bounds 5 -5 --alignment_type identity
+        # using an existing video, bootstrap a scene boundary from 15s from the start and 15s from the end, apply a
+        #   maximum duration of 90s and trim with transcrips, generate video on completion
+        python main.py --path_content results-witch/video.mp4 --profile popcorn \
+            --path_result results-witch/test --clip_bounds 15 -15 --duration_max 90 --alignment_type transcript 
 
-    # extract a letter-box trimmed example from the default scene defintions (with no trimming)
-    ./run_local.sh 0 --path_content path/video.mp4 --path_result results/ --profile letterbox 
+        # using an existing video, bootstrap a scene boundary from 15s from the start and 15s from the end, apply a
+        #   maximum duration of 90s and trim with transcrips
+        python main.py --path_content results-witch/video.mp4 --finalize_type tag \
+            --path_result results-witch/test --clip_bounds 15 -15 --duration_max 90 --alignment_type transcript 
 
-    # perform the same task but emulating the local ContentAI interface
-    ./run_local.sh 1 path/video.mp4 results/ '{"profile":"letterbox"}'
-
-    # perform the same task but use the full docker-based ContentAI interface
-    ./run_local.sh DOCKERIMAGE path/video.mp4 results/ '{"profile":"letterbox"}'
-
+        # using an existing video, bootstrap a scene bonudary from 5s from the start and 5s from the end, trim with 
+        #   detected identity tags and do not encode a resultant video or frame (no profile provided)
+        python main.py --path_content results-witch/HBO_20200222_114000_000803_00108_season_of_the_witch.mp4/video.mp4 \
+            --path_result results-witch/test --clip_bounds 5 -5 --alignment_type identity
 
 
 Deploy and Run
@@ -210,6 +211,7 @@ Changes
     - don't skip/abort trimming if there is no start marker found
     - fix duration requirement bug for detection of events 
     - refactor to allow event trimming
+    - add new capabilities to exclude/include different sub-types of a tag
     
 
 - 1.0.2
