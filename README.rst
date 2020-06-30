@@ -212,6 +212,7 @@ Changes
     - fix duration requirement bug for detection of events 
     - refactor to allow event trimming
     - add new capabilities to exclude/include different sub-types of a tag
+    - add event source information to output files
     
 
 - 1.0.2

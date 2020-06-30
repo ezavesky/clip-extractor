@@ -16,7 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ===============LICENSE_END=========================================================
-# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -
 
 from os import getenv
 import sys
@@ -36,6 +36,28 @@ import _version
 
 from getclips import get_clips, get_duration, validate_profile
 from event_retrieval import parse_results, event_rle, load_scenes, event_alignment
+
+import bisect
+
+def do_alignment (metadata_path, align_type, time_tuples, list_of_extractors=None):
+    print("metadata_path: " + str(metadata_path))
+    print("align_type: " + str(align_type))
+    print("time_tuples: " + str(time_tuples))
+    print("list_of_extractors: " + str(list_of_extractors))
+    bounds = parse_results(metadata_path, verbose=True, parser_type=align_type)
+    print("type of bounds is" + str(type(bounds)))
+    if list_of_extractors is not None and len(list_of_extractors) > 0:
+        bounds = bounds[bounds['extractor'].isin(list_of_extractors)]
+    starts = sorted(bounds['time_begin'])       # start and stop must be sorted separately b/c of possible overlap
+    stops = sorted(bounds['time_end'])
+    output = []
+    for t_begin, t_end in time_tuples:
+        left = bisect.bisect_left(starts, t_begin) - 1
+        new_begin = starts[left] if left >= 0 else starts[0]
+        right = bisect.bisect_right(stops, t_end)
+        new_end = stops[right] if right < len(stops) else stops[-1]
+        output.append((new_begin, new_end))
+    return output
 
 
 def clip(input_params=None, args=None):
@@ -93,6 +115,7 @@ def clip(input_params=None, args=None):
                             help='FILE to specify scene begin,end or DIRECTORY with extractor event outputs')
     submain.add_argument('--quiet', dest='quiet', default=False, action='store_true', help='do not verbosely print operations')
     submain.add_argument('--csv_file', dest='csv_file', default='', type=str, help='also write output records to this CSV file')
+    submain.add_argument('--snack_id', type=int, default=-10, help='append unique identifier to the row')
 
     submain = parser.add_argument_group('encoding/output specifications')
     submain.add_argument('--profile', type=str, default='none', help='processing profile to use (specify "list" for available list)')
@@ -229,14 +252,20 @@ def clip(input_params=None, args=None):
     version_dict = _version.version()
     dict_result = {'config': {'version':version_dict['version'], 'extractor':version_dict['package'],
                             'input':str(path_video.resolve()), 'timestamp': str(datetime.now()) }, 'results':[] }
+    # enrich each row with event type info
     logger.info(f"Trimmed to {len(list_clips)} scenes...")
+    df_scenes["alignment_type"] = input_vars['alignment_type']
+    df_scenes["event_type"] = input_vars['event_type']    
+    if input_vars['snack_id'] >= 0:
+        df_scenes["snack_id"] = input_vars['snack_id']
+    dict_result['results'] = df_scenes.to_dict(orient='records')
 
     # write out data if completed
+    logger.info("*p6* exporting cut times to csv/json files file")
     if len(input_vars['path_result']) > 0:
         if not path_result.exists():
             path_result.mkdir(parents=True)
         path_output = path_result.joinpath("data.json")
-        dict_result['results'] = df_scenes.to_dict(orient='records')
         with path_output.open('wt') as f:
             json.dump(dict_result, f)
         logger.info(f"Written JSON to '{path_output.resolve()}'...")
@@ -245,6 +274,7 @@ def clip(input_params=None, args=None):
             path_output = Path(input_vars['csv_file'])
             if not path_output.parent.exists():
                 path_output.parent.mkdir(parents=True)
+            df_scenes["time_tuples"] = time_tuples[0]   # TODO: alternate integration method?
             df_scenes.to_csv(str(path_output), index=False)
             logger.info(f"Written CSV records to '{path_output.resolve()}'...")
 

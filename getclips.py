@@ -28,7 +28,7 @@ def find_crop_coordinates (filename):
 
 def video_cut (source, start, stop, dest, profile):
     dur = stop - start
-    cmd = f"ffmpeg -v quiet -ss {start} -i {source} -t {dur} {profile} {dest} "
+    cmd = f"ffmpeg -v quiet -ss {start} -i {source} -t {dur} {profile} {dest}"
     #print (cmd)
     return os.system(cmd)
 

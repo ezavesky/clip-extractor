@@ -67,6 +67,8 @@ def parse_results(dir_content, parser_type, verbose=False, extractor_list=None):
     if type(parser_type) is str:
         parser_type = [parser_type]
     path_content = Path(dir_content)
+    print("path content: " + str(path_content))
+    print("parser_type: " + str(parser_type))
     if not path_content.exists() or not path_content.is_dir:
         return empty_dataframe()
     parser_sub_incl = ""
@@ -83,6 +85,7 @@ def parse_results(dir_content, parser_type, verbose=False, extractor_list=None):
     parser_type = parser_new
     print(parser_sub_excl, parser_sub_incl)
 
+    ## I'M HERE IN MY DEBUGGING
     # TODO: open this up for other input types (see other entries under 'tag_type' 
     #       in https://gitlab.research.att.com/turnercode/metadata-flatten-extractor/blob/master/docs/README.rst#getting-started)
     list_parser_modules = parser_get_by_type(parser_type)
@@ -97,6 +100,7 @@ def parse_results(dir_content, parser_type, verbose=False, extractor_list=None):
     
     df_return = empty_dataframe()
     for parser_obj in list_parser_modules:  # iterate through auto-discovered packages
+        print(parser_obj)
         parser_instance = parser_obj['obj'](dir_content)   # create instance
         df = parser_instance.parse({"verbose": verbose})  # attempt to process
         if df is not None:
