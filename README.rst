@@ -118,8 +118,8 @@ configuration.
             --path_result results-witch/test --duration_max 90 --alignment_type transcript --profile popcorn 
 
         # using an existing video, bootstrap a scene boundary from 15s from the start and 15s from the end
-        #   align using tags of type 'tag' containing the word 'face'
-        python main.py --path_content results-witch/video.mp4 --profile popcorn \
+        #   align using tags of type 'tag' containing the word 'face'; write CSV output and uniquely tag each output
+        python main.py --path_content results-witch/video.mp4 --profile popcorn --snack_id 12 --csv_file output.csv\
             --path_result results-witch/test --clip_bounds 15 -15 --duration_max 90 --alignment_type "tag:face" 
 
         # using an existing video, bootstrap a scene boundary from 15s from the start and 15s from the end, apply a

@@ -82,8 +82,8 @@ def clip(input_params=None, args=None):
                 --path_result results-witch/test --duration_max 90 --alignment_type transcript --profile popcorn 
 
             # using an existing video, bootstrap a scene boundary from 15s from the start and 15s from the end
-            #   align using tags of type 'tag' containing the word 'face'
-            python main.py --path_content results-witch/video.mp4 --profile popcorn \
+            #   align using tags of type 'tag' containing the word 'face'; write CSV output and uniquely tag each output
+            python main.py --path_content results-witch/video.mp4 --profile popcorn --snack_id 12 --csv_file output.csv\
                 --path_result results-witch/test --clip_bounds 15 -15 --duration_max 90 --alignment_type "tag:face" 
 
             # using an existing video, bootstrap a scene boundary from 15s from the start and 15s from the end
@@ -114,7 +114,7 @@ def clip(input_params=None, args=None):
     submain.add_argument('--path_scenes', type=str, default="", 
                             help='FILE to specify scene begin,end or DIRECTORY with extractor event outputs')
     submain.add_argument('--quiet', dest='quiet', default=False, action='store_true', help='do not verbosely print operations')
-    submain.add_argument('--csv_file', dest='csv_file', default='', type=str, help='also write output records to this CSV file')
+    submain.add_argument('--csv_file', dest='csv_file', default='', type=str, help='also write output records to this CSV file (in the result dir)')
     submain.add_argument('--snack_id', type=int, default=-10, help='append unique identifier to the row')
 
     submain = parser.add_argument_group('encoding/output specifications')
@@ -271,10 +271,11 @@ def clip(input_params=None, args=None):
         logger.info(f"Written JSON to '{path_output.resolve()}'...")
 
         if len(input_vars['csv_file']):
-            path_output = Path(input_vars['csv_file'])
+            path_output = path_result.joinpath(input_vars['csv_file'])
             if not path_output.parent.exists():
                 path_output.parent.mkdir(parents=True)
-            df_scenes["time_tuples"] = time_tuples[0]   # TODO: alternate integration method?
+            if "event_begin" in df_scenes.columns:
+                df_scenes = df_scenes.drop(columns=['event_begin', 'event_end'])
             df_scenes.to_csv(str(path_output), index=False)
             logger.info(f"Written CSV records to '{path_output.resolve()}'...")
 
