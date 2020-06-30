@@ -28,7 +28,7 @@ def find_crop_coordinates (filename):
 
 def video_cut (source, start, stop, dest, profile):
     dur = stop - start
-    cmd = f"ffmpeg -v quiet -ss {start} -i {source} -t {dur} {profile} {dest} "
+    cmd = f"ffmpeg -v quiet -ss {start} -i {source} -t {dur} {profile} {dest}"
     #print (cmd)
     return os.system(cmd)
 
@@ -115,6 +115,8 @@ def get_clips (input_video, scene_list, output_dir, overwrite=False, profile="de
 
 def get_duration (input_video):
     import subprocess
+    if not os.path.exists(input_video):
+        return 0
     res = subprocess.check_output(f'ffprobe -i {input_video} -show_entries format=duration -v quiet -of csv="p=0"',shell=True)
     return float(res)
 

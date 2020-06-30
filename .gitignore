@@ -8,6 +8,10 @@ output
 workflow.dot
 results
 
+# scripts
+*.bat
+*.sh
+
 # checkpoint
 *logs
 *checkpoint
