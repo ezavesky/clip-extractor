@@ -137,6 +137,7 @@ def clip(input_params=None, args=None):
     submain.add_argument('--alignment_type', type=str, default=None, help='what tag_type* should be used for clip alignment (default %(default)s)')
     submain.add_argument('--alignment_extractors', nargs='+', default=None, help='use shots only from these extractors during alignment')
     submain.add_argument('--alignment_min_score', type=float, default=0.6, help='min confidence for new event to be use in trim (default %(default)s)')
+    submain.add_argument('--alignment_no_shrink', default=False, action='store_true', help='forbid shrinking alignment during processing')
     
     input_vars = contentai.metadata
     if args is not None:
@@ -220,7 +221,8 @@ def clip(input_params=None, args=None):
                 logger.info(f"[PRE-Scene {idx}]: START {row['time_begin']} - END {row['time_end']} ")
 
         df_scenes = event_alignment(df_event, df_scenes, input_vars['duration_max'], input_vars['duration_min'], 
-                                    df_events_fallback=df_events_fallback, score_threshold=input_vars['alignment_min_score'])
+                                    df_events_fallback=df_events_fallback, score_threshold=input_vars['alignment_min_score'],
+                                    allow_flip=not input_vars['alignment_no_shrink'])
         if not input_vars['quiet']:
             for idx, row in df_scenes.iterrows():
                 logger.info(f"[POST-Scene {idx}]: START {row['time_begin']} ({row['event_begin']}) - END {row['time_end']} ({row['event_end']})")

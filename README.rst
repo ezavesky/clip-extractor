@@ -26,7 +26,7 @@ more detail in the `main <main.py>`__ script.
     -  ``path_content`` - *(str)* - input video path for files to label (*default=video.mp4*)
     -  ``path_result`` - *(str)* - output path for samples (*default=.*)
     -  ``path_scenes`` - *(str)* - FILE to specify scene begin,end or DIRECTORY with extractor event outputs (*default=``path_content``*)
-    -  ``quiet`` - *(bool)* - verbose input/output configuration printing (*default=false*)
+    -  ``quiet`` - *(flag, no arg)* - verbose input/output configuration printing (*default=false*)
     -  ``csv_file`` - *(str)* - also write output records to this CSV file
 - Encoding Specification
     -  ``profile`` - *(string)* - specify a specific transcoding profile for the output video clips
@@ -38,11 +38,12 @@ more detail in the `main <main.py>`__ script.
 - Scene Specification
     -  ``event_type`` - *(string)* - specify an event type to look for in generation (*default=tag*)
     -  ``event_expand_length`` - *(float)* - expand instant events to a minimum of this length in seconds (*default=5*)
+    -  ``event_min_score`` - *(float)* - min confidence for new event to be use in trim (*default=0.6*)
     -  ``clip_bounds`` - *(float, float)* - fixed scene timing (instead of events); start/stop (10 36) or negative stop trims from end (10 -10)
 - Alignment Specification
     -  ``alignment_type`` - *(string)* - what tag_type should be used for clip alignment (*default=None*)
     -  ``alignment_extractors`` - *(string list)* - use shots only from these extractors during alignment (*default=None*)
-    -  ``event_min_score`` - *(float)* - min confidence for new event to be use in trim (*default=0.6*)
+    -  ``alignment_no_shrink`` - *(flag, no arg)* - forbid shrinking alignment during processing (*default=False*)
 
 
 Clip Extractor Operations
@@ -113,9 +114,9 @@ configuration.
         identity:^speaker\_ -> search among tag_type 'identity' but tag name must *NOT* contain 'speaker\_'
 
     Example execution patterns...
-        # detect scenes from transcript output (max of 90s), then apply standard trimming 
+        # detect scenes from transcript output (max of 90s), then apply standard trimming, forbid "shrinking" during alignment
         python main.py --path_content results-witch/video.mp4 \
-            --path_result results-witch/test --duration_max 90 --alignment_type transcript --profile popcorn 
+            --path_result results-witch/test --duration_max 90 --alignment_type transcript --profile popcorn --alignment_no_shrink
 
         # using an existing video, bootstrap a scene boundary from 15s from the start and 15s from the end
         #   align using tags of type 'tag' containing the word 'face'; write CSV output and uniquely tag each output
@@ -205,6 +206,9 @@ Changes
 
 1.0
 ---
+
+- 1.0.4
+    - fixes for reverse search during alignment, add flag ``--alignment_no_shrink`` to disable
 
 - 1.0.3
     - fallback event type added, more verbosity when that fallback is chosen

@@ -215,8 +215,9 @@ def event_search(row, df, max_duration, direction_earlier, df_fallback=None, all
     field_search = 'time_begin' if direction_earlier else 'time_end'
 
     idx = df[field_search].searchsorted(row[field_search], side=side_search)
-    if not direction_earlier:
+    if direction_earlier:
         idx -= 1
+    # print("PRIMARY", direction_earlier, idx,df )
 
     if idx >= 0 and idx < len(df):
         # print(left, len(df_starts), row['time_begin'])
@@ -233,10 +234,11 @@ def event_search(row, df, max_duration, direction_earlier, df_fallback=None, all
             else:
                new_row['time_begin'] = new_row['time_end']
             time_return, event_return = event_search(new_row, df, max_duration, not direction_earlier, df_fallback, False)
+            # print("FLIP PROPOSAL", direction_earlier, time_return)
         
         if df_fallback is not None:   # utilize fallback if there (e.g. shots)
             idx = df_fallback[field_search].searchsorted(row[field_search], side=side_search)
-            if not direction_earlier:
+            if direction_earlier:
                 idx -= 1
             if idx >= 0 and idx < len(df_fallback):
                 time_fallback = df_fallback.iloc[idx][field_search]
@@ -248,7 +250,8 @@ def event_search(row, df, max_duration, direction_earlier, df_fallback=None, all
     return time_return, event_return
 
 
-def event_alignment(df_events, df_scenes, max_duration=-1, min_duration=-1, df_events_fallback=None, score_threshold=0.5):
+def event_alignment(df_events, df_scenes, max_duration=-1, min_duration=-1, 
+                    df_events_fallback=None, score_threshold=0.5, allow_flip=True):
     df_events_sub = df_events[df_events['score'] >= score_threshold]
     df_starts = df_events_sub.sort_values('time_begin')       # start and stop must be sorted separately b/c of possible overlap
     df_ends = df_events_sub.sort_values('time_end')
@@ -259,7 +262,7 @@ def event_alignment(df_events, df_scenes, max_duration=-1, min_duration=-1, df_e
         df_events_sub = df_events_fallback[df_events_fallback['score'] >= score_threshold]
         df_starts_fallback = df_events_sub.sort_values('time_begin')
         df_ends_fallback = df_events_sub.sort_values('time_end')
-
+    # print("ALLOW FLIP", allow_flip)
     list_return = []
     for idx, row in df_scenes.iterrows():
         new_row = row.copy()   # copy to a new working row
@@ -267,9 +270,9 @@ def event_alignment(df_events, df_scenes, max_duration=-1, min_duration=-1, df_e
         new_row['event_end'] = {}
 
         new_row['time_begin'], new_row['event_begin'] = \
-            event_search(row, df_starts, max_duration, True, df_starts_fallback)
+            event_search(row, df_starts, max_duration, True, df_starts_fallback, allow_flip)
         new_row['time_end'], new_row['event_end'] = \
-            event_search(row, df_ends, max_duration, False, df_ends_fallback)
+            event_search(row, df_ends, max_duration, False, df_ends_fallback, allow_flip)
 
         # TODO: instead of hard cut for end, trim from both sides, assuming event in middle?
 
