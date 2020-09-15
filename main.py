@@ -31,7 +31,7 @@ import logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-import contentai
+import contentaiextractor as contentai
 import _version
 
 from getclips import get_clips, get_duration, validate_profile
