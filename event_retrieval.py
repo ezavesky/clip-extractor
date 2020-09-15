@@ -33,8 +33,8 @@ import numpy as np
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
-from metadata_flatten.parsers import get_by_type as parser_get_by_type  # parse other extractor inputs
-from metadata_flatten.parsers import empty_dataframe
+from contentai_metadata_flatten.parsers import get_by_type as parser_get_by_type  # parse other extractor inputs
+from contentai_metadata_flatten.parsers import empty_dataframe
 
 
 def load_scenes(path_scenes, dir_content=None, parser_type=None, verbose=False):
