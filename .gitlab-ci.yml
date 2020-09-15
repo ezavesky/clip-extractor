@@ -68,7 +68,7 @@ before_script:
   - export BUILD_IMAGE="$(cat build/image)"
   # if running on master, use proper port; otherwise use debug port for publish on HOST
   - '[ "$CI_COMMIT_REF_NAME" == "master" ] && export BUILD_PORT="$DEPLOY_PORT_PROD" || export BUILD_PORT="$DEPLOY_PORT_DEV" '
-  - '[ "$CI_COMMIT_REF_NAME" == "master" ] && export BUILD_NAME="$DOCKER_PROJECT-master" || export BUILD_NAME="$DOCKER_PROJECT-dev" '
+  - '[ "$CI_COMMIT_REF_NAME" == "master" ] && export BUILD_NAME="$DOCKER_PROJECT" || export BUILD_NAME="$DOCKER_PROJECT-dev" '
   # derive container file from artifact name
   - export CONTAINER_TEST_FILE="$BUILD_ARTIFACT"
   - export CONTAINER_TEST_FILE_APP="$(echo '$CONTAINER_TEST_FILE' | sed -e 's/\.tar$/-app.tar/g')"
@@ -176,7 +176,7 @@ cleanup:
 
 
 contentai_push:
-  stage: publish
+  stage: deploy
   # stage: brute
   script:
     # This script requires a special ContentAI API Key.
@@ -191,19 +191,21 @@ contentai_push:
     # - /tmp/contentai login $CONTENTAI_API_KEY
     - mkdir -p ~/.contentai 
     - echo "{ \"apiKey\":\"$CONTENTAI_API_KEY\", \"apiEndpoint\":\"https://prod.api.contentai.io\" }" > ~/.contentai/config
+    # - cat ~/.contentai/config  # don't reveal secrets!
     # grab latest docker image
-    # - scp "$USER_NAME@$DEPLOY_HOST:$DEPLOY_STORAGE/sceneboundary-extractor-1.0.5-f99af636.tar" "$CONTAINER_TEST_FILE" 
     - scp "$USER_NAME@$DEPLOY_HOST:$BUILD_STORAGE" "$CONTAINER_TEST_FILE"
     # load this docker image to local host, retag
     - docker load -i $CONTAINER_TEST_FILE
     # deploy via contentai
-    # - /tmp/contentai deploy sceneboundary --cpu 1024 --memory 2048 -i "vmlr/analytics:sceneboundary-extractor-1.0.5-f99af636"
-    - /tmp/contentai deploy dsai_$DOCKER_PROJECT -i "$BUILD_IMAGE"
+    - 'export CORE_CONTAINER_NAME=$(grep "name: " extractor.yml | sed -e "s/.*: //g")'
+    - 'export DEV_CONTAINER_NAME=$(echo $CORE_CONTAINER_NAME | sed -e "s/$/_dev/g")'
+    - echo "Dev Container - $DEV_CONTAINER_NAME"
+    - if [ "$CI_COMMIT_REF_NAME" == "master" ] ; then /tmp/contentai extractors remove $DEV_CONTAINER_NAME; else sed -e "s/\(name.*\) .*/\1 $DEV_CONTAINER_NAME/g" -i".bak" extractor.yml; fi
+    - echo "Deploy extractor name=  $(grep 'name:' extractor.yml) ; DEV name= $DEV_CONTAINER_NAME"
+    - /tmp/contentai deploy -i "$BUILD_IMAGE"
+    # deploy via contentai
   dependencies:
     - setup
-  only:
-    - master
-
 
 
 # docgen:
