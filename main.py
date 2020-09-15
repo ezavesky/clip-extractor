@@ -28,6 +28,7 @@ import json
 
 import logging
 
+logging.basicConfig(level=logging.DEBUG, format='%(message)s')
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
@@ -148,6 +149,10 @@ def clip(input_params=None, args=None):
         input_vars.update(input_params)
 
     version_info = _version.version()
+
+    if input_vars['quiet']:
+        logger.setLevel(logging.WARNING)
+
     logger.info(f"Received parameters: {input_vars}")
     logger.info(f"Running Version: {version_info}")
 
@@ -165,12 +170,10 @@ def clip(input_params=None, args=None):
     if not validate_profile(input_vars['profile']):
         return None
 
-    if not input_vars['quiet']:
-        logger.info("*p1* (asset extraction) ffmpeg operation to pull out clips; provide specific processing profiles")
+    logger.info("*p1* (asset extraction) ffmpeg operation to pull out clips; provide specific processing profiles")
 
     duration_video = get_duration(path_video)  # attempt to get duration, 0 if not available
-    if not input_vars['quiet']:
-        logger.info("*p2* (clip specification) peak detection and alignment to various input components (e.g. shots, etc)")
+    logger.info("*p2* (clip specification) peak detection and alignment to various input components (e.g. shots, etc)")
     if input_vars['clip_bounds'] is not None:       # this overrides any other scene designations
         if input_vars['clip_bounds'][1] < 0.0:
             input_vars['clip_bounds'][1] += duration_video
@@ -187,17 +190,11 @@ def clip(input_params=None, args=None):
     if df_scenes is None or not len(df_scenes):
         logger.error(f"Error: No scene sources were provided ('{input_vars['path_scenes']}') or found with events, aborting.")
         return
-    if not input_vars['quiet']:
-        logger.info(f"Found {len(df_scenes)} scenes with average length {(df_scenes['time_end']-df_scenes['time_begin']).mean()}s from source file...")
 
-    if not input_vars['quiet']:
-        logger.info("*p3a* (quality assessment) quality evaluation of frames or video for refined boundaries")
-
-    if not input_vars['quiet']:
-        logger.info("*p3b* (moderation assessment) quality evaluation of frames or video for refined boundaries")
-
-    if not input_vars['quiet']:
-        logger.info("*p3* (trimming refinement) refinement based on quality requirements (if any)")
+    logger.info(f"Found {len(df_scenes)} scenes with average length {(df_scenes['time_end']-df_scenes['time_begin']).mean()}s from source file...")
+    logger.info("*p3a* (quality assessment) quality evaluation of frames or video for refined boundaries")
+    logger.info("*p3b* (moderation assessment) quality evaluation of frames or video for refined boundaries")
+    logger.info("*p3* (trimming refinement) refinement based on quality requirements (if any)")
 
     if input_vars['alignment_type'] is None:  # if no alignment type specified, use faullback
         if len(input_vars['finalize_type']):
@@ -213,19 +210,16 @@ def clip(input_params=None, args=None):
         df_events_fallback = None
         if len(input_vars['finalize_type']) and input_vars['finalize_type'] != input_vars['alignment_type']:   # had additional fallback type
             df_events_fallback = parse_results(meta_path(), input_vars['finalize_type'], verbose=not input_vars['quiet'])
-            if not input_vars['quiet']:
-                logger.info(f"(alignment boundaries include {len(df_events_fallback)} fallback events of type '{input_vars['finalize_type']}')")
+            logger.info(f"(alignment boundaries include {len(df_events_fallback)} fallback events of type '{input_vars['finalize_type']}')")
 
-        if not input_vars['quiet']:
-            for idx, row in df_scenes.iterrows():
-                logger.info(f"[PRE-Scene {idx}]: START {row['time_begin']} - END {row['time_end']} ")
+        for idx, row in df_scenes.iterrows():
+            logger.info(f"[PRE-Scene {idx}]: START {row['time_begin']} - END {row['time_end']} ")
 
         df_scenes = event_alignment(df_event, df_scenes, input_vars['duration_max'], input_vars['duration_min'], 
                                     df_events_fallback=df_events_fallback, score_threshold=input_vars['alignment_min_score'],
                                     allow_flip=not input_vars['alignment_no_shrink'])
-        if not input_vars['quiet']:
-            for idx, row in df_scenes.iterrows():
-                logger.info(f"[POST-Scene {idx}]: START {row['time_begin']} ({row['event_begin']}) - END {row['time_end']} ({row['event_end']})")
+        for idx, row in df_scenes.iterrows():
+            logger.info(f"[POST-Scene {idx}]: START {row['time_begin']} ({row['event_begin']}) - END {row['time_end']} ({row['event_end']})")
 
     list_clips = []
     if len(df_scenes):
@@ -234,11 +228,8 @@ def clip(input_params=None, args=None):
         #     df_scenes["time_begin"] = df_scenes["time_begin"].apply(lambda x: 0 if x - t_smudge < 0 else x - t_smudge)            
         #     df_scenes["time_end"] = df_scenes["time_end"].apply(lambda x: 0 if x + t_smudge > duration_video else x + t_smudge)
 
-        if not input_vars['quiet']:
-            logger.info(f"Trimmed to {len(df_scenes)} scenes with average length {(df_scenes['time_end']-df_scenes['time_begin']).mean()}s from source file...")
-
-        if not input_vars['quiet']:
-            logger.info("*p4* (previous input) processing input for regions")
+        logger.info(f"Trimmed to {len(df_scenes)} scenes with average length {(df_scenes['time_end']-df_scenes['time_begin']).mean()}s from source file...")
+        logger.info("*p4* (previous input) processing input for regions")
         time_tuples = df_scenes[["time_begin", "time_end"]].values.tolist()
         list_clips = get_clips(str(path_video), time_tuples, path_result, 
                                 profile=input_vars['profile'], overwrite=input_vars['overwrite'])
@@ -247,8 +238,7 @@ def clip(input_params=None, args=None):
         logger.info(f"Clipped video files stored as: '{list_clips}'... ")
         df_scenes["path"] = list_clips
 
-    if not input_vars['quiet']:
-        logger.info("*p5* (clip publishing) push of clips to result directory, an S3 bucket, hadoop, azure, etc")
+    logger.info("*p5* (clip publishing) push of clips to result directory, an S3 bucket, hadoop, azure, etc")
 
     # write output of each class and segment
     version_dict = _version.version()

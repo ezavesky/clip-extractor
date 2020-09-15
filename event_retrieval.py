@@ -31,7 +31,6 @@ import numpy as np
 
 
 logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)
 
 from contentai_metadata_flatten.parsers import get_by_type as parser_get_by_type  # parse other extractor inputs
 from contentai_metadata_flatten.parsers import empty_dataframe
@@ -96,7 +95,7 @@ def parse_results(dir_content, parser_type, verbose=False, extractor_list=None):
     
     df_return = empty_dataframe()
     for parser_obj in list_parser_modules:  # iterate through auto-discovered packages
-        parser_instance = parser_obj['obj'](dir_content)   # create instance
+        parser_instance = parser_obj['obj'](dir_content, logger=logger)   # create instance
         df = parser_instance.parse({"verbose": verbose})  # attempt to process
         if df is not None:
             df = df[df["tag_type"].isin(parser_type)]   # subselect only shots
