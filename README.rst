@@ -207,6 +207,9 @@ Changes
 1.0
 ---
 
+- 1.1.0
+    - switch to pypi packages for the [metadata flattener](https://pypi.org/project/contentai-metadata-flatten/) and [contentai library](https://pypi.org/project/contentaiextractor/)
+
 - 1.0.4
     - fixes for reverse search during alignment, add flag ``--alignment_no_shrink`` to disable
 
