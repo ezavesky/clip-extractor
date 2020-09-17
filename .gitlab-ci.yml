@@ -200,7 +200,7 @@ contentai_push:
     - 'export CORE_CONTAINER_NAME=$(grep "name: " extractor.yml | sed -e "s/.*: //g")'
     - 'export DEV_CONTAINER_NAME=$(echo $CORE_CONTAINER_NAME | sed -e "s/$/_dev/g")'
     - echo "Dev Container - $DEV_CONTAINER_NAME"
-    - if [ "$CI_COMMIT_REF_NAME" == "master" ] ; then /tmp/contentai extractors remove $DEV_CONTAINER_NAME; else sed -e "s/\(name.*\) .*/\1 $DEV_CONTAINER_NAME/g" -i".bak" extractor.yml; fi
+    - if [ "$CI_COMMIT_REF_NAME" == "master" ] ; then /tmp/contentai extractors remove $DEV_CONTAINER_NAME || true; else sed -e "s/\(name.*\) .*/\1 $DEV_CONTAINER_NAME/g" -i".bak" extractor.yml; fi
     - echo "Deploy extractor name=  $(grep 'name:' extractor.yml) ; DEV name= $DEV_CONTAINER_NAME"
     - /tmp/contentai deploy -i "$BUILD_IMAGE"
     # deploy via contentai
